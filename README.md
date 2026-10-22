@@ -1,28 +1,28 @@
-# Reword
+# txtfmt
 
-> AI-powered text rewriter for your terminal.
+> AI-powered text formatting for your terminal.
 > Fix grammar, rephrase, summarize — in any app, with one command.
 
-[![CI](https://github.com/digitronik/reword/actions/workflows/ci.yml/badge.svg)](https://github.com/digitronik/reword/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/reword)](https://pypi.org/project/reword/)
-[![Python](https://img.shields.io/pypi/pyversions/reword)](https://pypi.org/project/reword/)
+[![CI](https://github.com/digitronik/txtfmt/actions/workflows/ci.yml/badge.svg)](https://github.com/digitronik/txtfmt/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/txtfmt)](https://pypi.org/project/txtfmt/)
+[![Python](https://img.shields.io/pypi/pyversions/txtfmt)](https://pypi.org/project/txtfmt/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ```
-$ reword fix "i can haz good grammer?"
+$ txtfmt fix "i can haz good grammer?"
 I can have good grammar?
 
-$ echo "This is a very long sentence that just keeps going" | reword concise
+$ echo "This is a very long sentence that just keeps going" | txtfmt concise
 This sentence is too long.
 
-$ reword professional --clipboard    # reads clipboard → rewrites → writes back
+$ txtfmt professional --clipboard    # reads clipboard → rewrites → writes back
 ```
 
 ---
 
 ## Table of Contents
 
-- [Why Reword?](#why-reword)
+- [Why txtfmt?](#why-txtfmt)
 - [Installation](#installation)
 - [Setup Guide](#setup-guide)
   - [Step 1 — Install clipboard tools](#step-1--install-clipboard-tools)
@@ -39,13 +39,13 @@ $ reword professional --clipboard    # reads clipboard → rewrites → writes b
 
 ---
 
-## Why Reword?
+## Why txtfmt?
 
 Every existing tool in this space (WritingTools, GhostEdit, ZyntaxAI…) is a **GUI desktop app** — Electron, Tauri, or PyQt5. They're 100–200 MB, framework-dependent, and impossible to script.
 
-Reword is a plain CLI tool: two dependencies, composes with pipes, works from hotkeys or scripts, and runs on every OS.
+txtfmt is a plain CLI tool: two dependencies, composes with pipes, works from hotkeys or scripts, and runs on every OS.
 
-| | **Reword** | GUI tools |
+| | **txtfmt** | GUI tools |
 |---|---|---|
 | Size | ~2 Python deps | 100–200 MB runtime |
 | Composability | Pipes, scripts, automation | GUI click-through only |
@@ -59,10 +59,10 @@ Reword is a plain CLI tool: two dependencies, composes with pipes, works from ho
 
 ```bash
 # Recommended — installs as an isolated tool
-uv tool install reword
+uv tool install txtfmt
 
 # Or with pip
-pip install reword
+pip install txtfmt
 ```
 
 > **New to uv?** Install it with: `curl -LsSf https://astral.sh/uv/install.sh | sh`
@@ -75,7 +75,7 @@ Follow these steps once after installing. This takes about 5 minutes.
 
 ### Step 1 — Install clipboard tools
 
-Reword uses your system's clipboard to read and paste text. The tools needed
+txtfmt uses your system's clipboard to read and paste text. The tools needed
 depend on your OS. **macOS and Windows users can skip this step** — everything
 is built in.
 
@@ -172,10 +172,10 @@ file (see [Step 3](#step-3--create-your-config)).
 ### Step 3 — Create your config
 
 Run this once to create a ready-to-edit config file at
-`~/.config/reword/config.toml`:
+`~/.config/txtfmt/config.toml`:
 
 ```bash
-reword config init
+txtfmt config init
 ```
 
 It will also check whether your clipboard tools from Step 1 are installed and
@@ -185,10 +185,10 @@ Open the file to set your default provider and model:
 
 ```bash
 # Linux / macOS
-nano ~/.config/reword/config.toml    # or: code, vim, whatever you prefer
+nano ~/.config/txtfmt/config.toml    # or: code, vim, whatever you prefer
 
 # Windows
-notepad %APPDATA%\reword\config.toml
+notepad %APPDATA%txtfmt\config.toml
 ```
 
 The minimum config for Ollama looks like this — the defaults already cover it,
@@ -216,7 +216,7 @@ model = "gpt-4o-mini"    # API key comes from OPENAI_API_KEY env var
 ### Step 4 — Verify everything works
 
 ```bash
-reword check
+txtfmt check
 ```
 
 Expected output:
@@ -226,7 +226,7 @@ Expected output:
 ✓ Provider 'ollama' is reachable  (model: qwen2.5:1.5b)
 ```
 
-If anything is wrong, `reword check` prints the exact command to fix it.
+If anything is wrong, `txtfmt check` prints the exact command to fix it.
 
 ---
 
@@ -234,19 +234,19 @@ If anything is wrong, `reword check` prints the exact command to fix it.
 
 ```bash
 # Pass text directly
-reword fix "me and him went to the store yesterday"
+txtfmt fix "me and him went to the store yesterday"
 
 # Pipe from stdin
-echo "this sentense has a typo" | reword fix
+echo "this sentense has a typo" | txtfmt fix
 
 # Read from clipboard and print the result
-reword fix --clipboard
+txtfmt fix --clipboard
 
 # Read from clipboard, rewrite, and write the result back to clipboard
-reword professional --clipboard
+txtfmt professional --clipboard
 
 # System-wide: read selected text from any app, rewrite, paste back in-place
-reword fix --system
+txtfmt fix --system
 ```
 
 ---
@@ -264,7 +264,7 @@ reword fix --system
 | `summarize` | Condense to the key points |
 | `email` | Format as a professional email with greeting and sign-off |
 
-Run `reword list` to see all modes including any custom ones you've added.
+Run `txtfmt list` to see all modes including any custom ones you've added.
 
 ---
 
@@ -274,16 +274,16 @@ Config file location:
 
 | OS | Path |
 |:---|:---|
-| Linux / macOS | `~/.config/reword/config.toml` |
-| Linux (custom) | `$XDG_CONFIG_HOME/reword/config.toml` |
-| Windows | `%APPDATA%\reword\config.toml` |
+| Linux / macOS | `~/.config/txtfmt/config.toml` |
+| Linux (custom) | `$XDG_CONFIG_HOME/txtfmt/config.toml` |
+| Windows | `%APPDATA%txtfmt\config.toml` |
 
-Run `reword config init` to create it, `reword config show` to see active values.
+Run `txtfmt config init` to create it, `txtfmt config show` to see active values.
 
 ### Full example
 
 ```toml
-# ~/.config/reword/config.toml
+# ~/.config/txtfmt/config.toml
 
 # Which provider to use by default
 default_provider = "ollama"
@@ -299,18 +299,18 @@ url   = "http://localhost:11434"
 model = "qwen2.5:1.5b"          # any model you have pulled
 
 [providers.openai]
-# API key: set OPENAI_API_KEY or REWORD_OPENAI_API_KEY in your environment
+# API key: set OPENAI_API_KEY or TXTFMT_OPENAI_API_KEY in your environment
 model = "gpt-4o-mini"
 
 [providers.anthropic]
-# API key: set ANTHROPIC_API_KEY or REWORD_ANTHROPIC_API_KEY in your environment
+# API key: set ANTHROPIC_API_KEY or TXTFMT_ANTHROPIC_API_KEY in your environment
 model = "claude-haiku-4-5-20251001"
 
 # Any OpenAI-compatible endpoint: Groq, Together AI, LM Studio, vLLM, etc.
 # [providers.openai-compat]
 # url   = "https://api.groq.com/openai/v1"
 # model = "llama-3.3-70b-versatile"
-# API key: set REWORD_COMPAT_API_KEY in your environment
+# API key: set TXTFMT_COMPAT_API_KEY in your environment
 ```
 
 ### API keys — environment variables
@@ -319,9 +319,9 @@ model = "claude-haiku-4-5-20251001"
 
 | Provider | Environment variable |
 |:---|:---|
-| OpenAI | `REWORD_OPENAI_API_KEY` or `OPENAI_API_KEY` |
-| Anthropic | `REWORD_ANTHROPIC_API_KEY` or `ANTHROPIC_API_KEY` |
-| OpenAI-compat | `REWORD_COMPAT_API_KEY` |
+| OpenAI | `TXTFMT_OPENAI_API_KEY` or `OPENAI_API_KEY` |
+| Anthropic | `TXTFMT_ANTHROPIC_API_KEY` or `ANTHROPIC_API_KEY` |
+| OpenAI-compat | `TXTFMT_COMPAT_API_KEY` |
 
 Add them to your shell profile (`~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`)
 so they load automatically in every session.
@@ -333,7 +333,7 @@ so they load automatically in every session.
 Add any number of custom modes to your config file:
 
 ```toml
-# ~/.config/reword/config.toml
+# ~/.config/txtfmt/config.toml
 
 [modes.translate-spanish]
 prompt = "Translate to Spanish. Keep technical terms in English."
@@ -356,8 +356,8 @@ label  = "Simplified"
 Use them exactly like built-in modes:
 
 ```bash
-reword translate-spanish "Good morning, how are you?"
-reword slack "Please review the pull request I opened for the authentication refactor."
+txtfmt translate-spanish "Good morning, how are you?"
+txtfmt slack "Please review the pull request I opened for the authentication refactor."
 ```
 
 ---
@@ -371,16 +371,16 @@ pastes the result back in-place. Bind it to a hotkey for a seamless workflow.
 
 ```
 # ~/.config/i3/config (or ~/.config/sway/config)
-bindsym $mod+g       exec --no-startup-id reword fix --system --notify
+bindsym $mod+g       exec --no-startup-id txtfmt fix --system --notify
 bindsym $mod+Shift+g exec --no-startup-id \
-    reword list | rofi -dmenu -p "Reword mode" | xargs -r -I{} reword {} --system --notify
+    txtfmt list | rofi -dmenu -p "txtfmt mode" | xargs -r -I{} txtfmt {} --system --notify
 ```
 
 ### Linux — Hyprland
 
 ```
 # ~/.config/hypr/hyprland.conf
-bind = $mainMod, G, exec, reword fix --system --notify
+bind = $mainMod, G, exec, txtfmt fix --system --notify
 ```
 
 ### Linux — GNOME / KDE (any desktop)
@@ -389,15 +389,15 @@ Go to **Settings → Keyboard → Custom Shortcuts** and add:
 
 | Name | Command | Shortcut |
 |:---|:---|:---|
-| Reword Fix | `reword fix --system --notify` | `Super+G` |
-| Reword Menu | `bash -c 'reword list \| rofi -dmenu -p Reword \| xargs -r reword --system --notify'` | `Super+Shift+G` |
+| txtfmt fix | `txtfmt fix --system --notify` | `Super+G` |
+| txtfmt menu | `bash -c 'txtfmt list \| rofi -dmenu -p txtfmt \| xargs -r txtfmt --system --notify'` | `Super+Shift+G` |
 
 ### macOS — Hammerspoon
 
 ```lua
 -- ~/.hammerspoon/init.lua
 hs.hotkey.bind({"cmd"}, "g", function()
-  hs.task.new("/usr/local/bin/reword", nil, {"fix", "--system", "--notify"}):start()
+  hs.task.new("/usr/local/bin/txtfmt", nil, {"fix", "--system", "--notify"}):start()
 end)
 ```
 
@@ -406,7 +406,7 @@ end)
 Create a **Quick Action** in Automator that runs a shell script:
 
 ```bash
-/usr/local/bin/reword fix --system --notify
+/usr/local/bin/txtfmt fix --system --notify
 ```
 
 Assign it a keyboard shortcut in **System Settings → Keyboard → Keyboard Shortcuts → Services**.
@@ -414,9 +414,9 @@ Assign it a keyboard shortcut in **System Settings → Keyboard → Keyboard Sho
 ### Windows — AutoHotkey v2
 
 ```ahk
-; reword.ahk
+; txtfmt.ahk
 #g:: {
-    Run "reword fix --system --notify", , "Hide"
+    Run "txtfmt fix --system --notify", , "Hide"
 }
 ```
 
@@ -425,21 +425,21 @@ Assign it a keyboard shortcut in **System Settings → Keyboard → Keyboard Sho
 ## Commands
 
 ```
-reword <mode> [TEXT]         Rewrite TEXT (or stdin if omitted)
-reword <mode> --clipboard    Read from clipboard, print result (also writes back)
-reword <mode> --system       Read selected text, rewrite, paste back in-place
-reword <mode> --provider P   Override the AI provider for this run
-reword <mode> --model M      Override the model for this run
-reword <mode> --notify       Show a desktop notification when done
+txtfmt <mode> [TEXT]         Rewrite TEXT (or stdin if omitted)
+txtfmt <mode> --clipboard    Read from clipboard, print result (also writes back)
+txtfmt <mode> --system       Read selected text, rewrite, paste back in-place
+txtfmt <mode> --provider P   Override the AI provider for this run
+txtfmt <mode> --model M      Override the model for this run
+txtfmt <mode> --notify       Show a desktop notification when done
 
-reword list                  List all available modes
-reword undo                  Restore the original text from the last rewrite
-reword check                 Check clipboard tools and provider connectivity
-reword config init           Create ~/.config/reword/config.toml
-reword config show           Show the active configuration
+txtfmt list                  List all available modes
+txtfmt undo                  Restore the original text from the last rewrite
+txtfmt check                 Check clipboard tools and provider connectivity
+txtfmt config init           Create ~/.config/txtfmt/config.toml
+txtfmt config show           Show the active configuration
 
-reword --version             Show version
-reword --help                Show help
+txtfmt --version             Show version
+txtfmt --help                Show help
 ```
 
 ---
@@ -447,8 +447,8 @@ reword --help                Show help
 ## Development
 
 ```bash
-git clone https://github.com/digitronik/reword.git
-cd reword
+git clone https://github.com/digitronik/txtfmt.git
+cd txtfmt
 uv sync --extra dev
 
 # Git hooks (ruff + file hygiene) — uses .pre-commit-config.yaml

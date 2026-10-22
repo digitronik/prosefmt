@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from reword.providers.base import ProviderError
-from reword.providers.openai_compat import OpenAICompatProvider
+from txtfmt.providers.base import ProviderError
+from txtfmt.providers.openai_compat import OpenAICompatProvider
 
 
 class TestOpenAICompatProvider:

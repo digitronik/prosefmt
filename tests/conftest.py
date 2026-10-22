@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from reword.config import Config, ModeConfig, ProviderConfig
+from txtfmt.config import Config, ModeConfig, ProviderConfig
 
 
 @pytest.fixture()

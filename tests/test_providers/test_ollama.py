@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from reword.providers.base import ProviderError
-from reword.providers.ollama import OllamaProvider
+from txtfmt.providers.base import ProviderError
+from txtfmt.providers.ollama import OllamaProvider
 
 
 class TestOllamaProvider:

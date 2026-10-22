@@ -1,6 +1,6 @@
 """Tests for modes and list-structure preservation."""
 
-from reword.modes import (
+from txtfmt.modes import (
     BUILTIN_MODES,
     has_list_structure,
     restore_list_prefixes,

@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 
-from reword.clipboard import Platform, detect_platform
+from txtfmt.clipboard import Platform, detect_platform
 
 
 def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int = 3000) -> None:
@@ -28,7 +28,7 @@ def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int 
                 "-t",
                 str(timeout_ms),
                 "-h",
-                "string:x-dunst-stack-tag:reword",
+                "string:x-dunst-stack-tag:txtfmt",
                 title,
             ]
             if body:
@@ -48,7 +48,7 @@ def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int 
                 '</binding></visual></toast>"; '
                 "$t = New-Object Windows.Data.Xml.Dom.XmlDocument; $t.LoadXml($xml); "
                 "[Windows.UI.Notifications.ToastNotificationManager]::"
-                'CreateToastNotifier("Reword").Show('
+                'CreateToastNotifier("txtfmt").Show('
                 "[Windows.UI.Notifications.ToastNotification]::new($t))"
             )
             subprocess.run(["powershell.exe", "-Command", ps], check=False, capture_output=True)
@@ -65,7 +65,7 @@ def _esc(s: str) -> str:
 
 
 def _stderr_fallback(title: str, body: str) -> None:
-    msg = f"[reword] {title}"
+    msg = f"[txtfmt] {title}"
     if body:
         msg += f": {body}"
     print(msg, file=sys.stderr)

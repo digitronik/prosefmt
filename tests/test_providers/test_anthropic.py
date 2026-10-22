@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from reword.providers.anthropic import AnthropicProvider
-from reword.providers.base import ProviderError
+from txtfmt.providers.anthropic import AnthropicProvider
+from txtfmt.providers.base import ProviderError
 
 
 class TestAnthropicProvider:
