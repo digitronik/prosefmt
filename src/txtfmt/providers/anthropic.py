@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from reword.providers.base import ProviderError
+from txtfmt.providers.base import ProviderError
 
 
 class AnthropicProvider:
@@ -28,7 +28,7 @@ class AnthropicProvider:
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         if not self.api_key:
             raise ProviderError(
-                "Anthropic API key not set — export REWORD_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY"
+                "Anthropic API key not set — export TXTFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY"
             )
 
         try:

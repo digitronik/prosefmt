@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from reword.config import ModeConfig
-from reword.core import RewordError, load_undo, rewrite, save_undo
-from reword.providers.base import ProviderError
+from txtfmt.config import ModeConfig
+from txtfmt.core import TxtfmtError, load_undo, rewrite, save_undo
+from txtfmt.providers.base import ProviderError
 
 from .conftest import FakeProvider
 
@@ -20,12 +20,12 @@ class TestRewrite:
 
     def test_empty_text_raises(self, default_config, sample_mode):
         provider = FakeProvider()
-        with pytest.raises(RewordError, match="No text"):
+        with pytest.raises(TxtfmtError, match="No text"):
             rewrite("", sample_mode, provider=provider, config=default_config)
 
     def test_whitespace_only_raises(self, default_config, sample_mode):
         provider = FakeProvider()
-        with pytest.raises(RewordError, match="No text"):
+        with pytest.raises(TxtfmtError, match="No text"):
             rewrite("   \n  ", sample_mode, provider=provider, config=default_config)
 
     def test_provider_error_propagates(self, default_config, sample_mode):

@@ -1,19 +1,19 @@
-"""Core rewriting engine — the brain of Reword."""
+"""Core rewriting engine — the brain of txtfmt."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from reword.modes import has_list_structure, restore_list_prefixes, strip_list_prefixes
-from reword.providers.base import ProviderError
+from txtfmt.modes import has_list_structure, restore_list_prefixes, strip_list_prefixes
+from txtfmt.providers.base import ProviderError
 
 if TYPE_CHECKING:
-    from reword.config import Config, ModeConfig
-    from reword.providers.base import Provider
+    from txtfmt.config import Config, ModeConfig
+    from txtfmt.providers.base import Provider
 
 
-class RewordError(Exception):
+class TxtfmtError(Exception):
     """Top-level error for rewriting failures."""
 
 
@@ -24,7 +24,7 @@ def rewrite(text: str, mode: ModeConfig, *, provider: Provider, config: Config) 
     request it.
     """
     if not text.strip():
-        raise RewordError("No text to rewrite")
+        raise TxtfmtError("No text to rewrite")
 
     text_to_send = text
     prefixes: list[str] | None = None
@@ -39,7 +39,7 @@ def rewrite(text: str, mode: ModeConfig, *, provider: Provider, config: Config) 
     except ProviderError:
         raise
     except Exception as exc:
-        raise RewordError(f"Rewrite failed: {exc}") from exc
+        raise TxtfmtError(f"Rewrite failed: {exc}") from exc
 
     result = result.strip()
 

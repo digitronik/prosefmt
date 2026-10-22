@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from reword.providers.base import ProviderError
+from txtfmt.providers.base import ProviderError
 
 
 class OllamaProvider:

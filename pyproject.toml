@@ -1,11 +1,11 @@
 [project]
-name = "reword"
-version = "0.1.0"
-description = "AI-powered text rewriter for your terminal — fix grammar, rephrase, summarize, and more. CLI-first, cross-platform, works system-wide."
+name = "txtfmt"
+dynamic = ["version"]
+description = "AI-powered text formatting for your terminal — fix grammar, rephrase, summarize, and more. CLI-first, cross-platform, works system-wide."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-keywords = ["ai", "text", "rewriter", "grammar", "cli", "ollama", "openai", "anthropic"]
+keywords = ["ai", "text", "formatter", "rewriter", "grammar", "cli", "txtfmt", "ollama", "openai", "anthropic"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -36,20 +36,26 @@ dev = [
 ]
 
 [project.scripts]
-reword = "reword.cli:cli"
+txtfmt = "txtfmt.cli:cli"
 
 [project.urls]
-Homepage = "https://github.com/digitronik/reword"
-Repository = "https://github.com/digitronik/reword"
-Issues = "https://github.com/digitronik/reword/issues"
-Changelog = "https://github.com/digitronik/reword/releases"
+Homepage = "https://github.com/digitronik/txtfmt"
+Repository = "https://github.com/digitronik/txtfmt"
+Issues = "https://github.com/digitronik/txtfmt/issues"
+Changelog = "https://github.com/digitronik/txtfmt/releases"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/txtfmt/_version.py"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/reword"]
+packages = ["src/txtfmt"]
 
 [tool.ruff]
 target-version = "py311"

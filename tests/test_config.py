@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from reword.config import Config, init_config
+from txtfmt.config import Config, init_config
 
 
 class TestConfigDefaults:
@@ -90,9 +90,9 @@ class TestConfigEnv:
         config = Config.load(tmp_path / "nope.toml")
         assert config.providers["openai"].api_key == "sk-test-123"
 
-    def test_reword_env_takes_priority(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def test_txtfmt_env_takes_priority(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENAI_API_KEY", "generic")
-        monkeypatch.setenv("REWORD_OPENAI_API_KEY", "specific")
+        monkeypatch.setenv("TXTFMT_OPENAI_API_KEY", "specific")
         config = Config.load(tmp_path / "nope.toml")
         assert config.providers["openai"].api_key == "specific"
 
@@ -102,7 +102,7 @@ class TestInitConfig:
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         path = init_config()
         assert path.exists()
-        assert "reword" in path.read_text().lower()
+        assert "txtfmt" in path.read_text().lower()
 
     def test_does_not_overwrite(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
