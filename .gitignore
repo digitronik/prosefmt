@@ -1,4 +1,4 @@
-src/txtfmt/_version.py
+src/prosefmt/_version.py
 __pycache__/
 *.py[cod]
 *$py.class

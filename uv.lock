@@ -521,7 +521,7 @@ wheels = [
 ]
 
 [[package]]
-name = "txtfmt"
+name = "prosefmt"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

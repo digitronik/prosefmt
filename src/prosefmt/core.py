@@ -1,19 +1,19 @@
-"""Core rewriting engine — the brain of txtfmt."""
+"""Core rewriting engine — the brain of prosefmt."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from txtfmt.modes import has_list_structure, restore_list_prefixes, strip_list_prefixes
-from txtfmt.providers.base import ProviderError
+from prosefmt.modes import has_list_structure, restore_list_prefixes, strip_list_prefixes
+from prosefmt.providers.base import ProviderError
 
 if TYPE_CHECKING:
-    from txtfmt.config import Config, ModeConfig
-    from txtfmt.providers.base import Provider
+    from prosefmt.config import Config, ModeConfig
+    from prosefmt.providers.base import Provider
 
 
-class TxtfmtError(Exception):
+class ProsefmtError(Exception):
     """Top-level error for rewriting failures."""
 
 
@@ -24,7 +24,7 @@ def rewrite(text: str, mode: ModeConfig, *, provider: Provider, config: Config) 
     request it.
     """
     if not text.strip():
-        raise TxtfmtError("No text to rewrite")
+        raise ProsefmtError("No text to rewrite")
 
     text_to_send = text
     prefixes: list[str] | None = None
@@ -39,7 +39,7 @@ def rewrite(text: str, mode: ModeConfig, *, provider: Provider, config: Config) 
     except ProviderError:
         raise
     except Exception as exc:
-        raise TxtfmtError(f"Rewrite failed: {exc}") from exc
+        raise ProsefmtError(f"Rewrite failed: {exc}") from exc
 
     result = result.strip()
 

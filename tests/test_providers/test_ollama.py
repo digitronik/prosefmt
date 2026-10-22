@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from txtfmt.providers.base import ProviderError
-from txtfmt.providers.ollama import OllamaProvider
+from prosefmt.providers.base import ProviderError
+from prosefmt.providers.ollama import OllamaProvider
 
 
 class TestOllamaProvider:

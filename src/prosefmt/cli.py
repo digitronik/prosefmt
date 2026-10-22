@@ -1,13 +1,13 @@
-"""Command-line interface — the user-facing shell of txtfmt.
+"""Command-line interface — the user-facing shell of prosefmt.
 
 Usage examples:
-    txtfmt fix "some text with erors"      # Fix grammar (stdout)
-    txtfmt professional --clipboard        # Read clipboard, rewrite, write back
-    txtfmt rephrase --system               # Read selection, rewrite, paste back in-place
-    echo "text" | txtfmt summarize         # Pipe mode
-    txtfmt list                            # Show available modes
-    txtfmt undo                            # Undo last rewrite
-    txtfmt config init                     # Create default config file
+    prosefmt fix "some text with erors"      # Fix grammar (stdout)
+    prosefmt professional --clipboard        # Read clipboard, rewrite, write back
+    prosefmt rephrase --system               # Read selection, rewrite, paste back in-place
+    echo "text" | prosefmt summarize         # Pipe mode
+    prosefmt list                            # Show available modes
+    prosefmt undo                            # Undo last rewrite
+    prosefmt config init                     # Create default config file
 """
 
 from __future__ import annotations
@@ -17,11 +17,11 @@ from pathlib import Path
 
 import click
 
-from txtfmt import __version__
-from txtfmt.config import Config
+from prosefmt import __version__
+from prosefmt.config import Config
 
 
-class TxtfmtCLI(click.Group):
+class ProsefmtCLI(click.Group):
     """Custom Click group that treats unknown subcommands as mode names."""
 
     def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
@@ -96,10 +96,10 @@ def _run_rewrite(
     model_override: str | None,
     show_notify: bool,
 ) -> None:
-    from txtfmt.clipboard import clipboard_write, paste_to_active_window
-    from txtfmt.core import TxtfmtError, rewrite, save_undo
-    from txtfmt.notify import notify
-    from txtfmt.providers import ProviderError, get_provider
+    from prosefmt.clipboard import clipboard_write, paste_to_active_window
+    from prosefmt.core import ProsefmtError, rewrite, save_undo
+    from prosefmt.notify import notify
+    from prosefmt.providers import ProviderError, get_provider
 
     config: Config = ctx.obj.get("config") or Config.load()
     mode = config.modes.get(mode_name)
@@ -126,14 +126,14 @@ def _run_rewrite(
         raise SystemExit(1)
 
     if show_notify:
-        notify("txtfmt", f"✦ {mode.label or mode_name}…", timeout_ms=30000)
+        notify("prosefmt", f"✦ {mode.label or mode_name}…", timeout_ms=30000)
 
     try:
         prov = get_provider(pname, pconfig)
         result = rewrite(input_text, mode, provider=prov, config=config)
-    except (ProviderError, TxtfmtError) as exc:
+    except (ProviderError, ProsefmtError) as exc:
         if show_notify:
-            notify("txtfmt", f"✗ {exc}", urgency="critical")
+            notify("prosefmt", f"✗ {exc}", urgency="critical")
         click.echo(f"Error: {exc}", err=True)
         raise SystemExit(1) from None
 
@@ -146,11 +146,11 @@ def _run_rewrite(
         time.sleep(0.1)
         paste_to_active_window()
         if show_notify:
-            notify("txtfmt", f"✓ {mode.label or mode_name}")
+            notify("prosefmt", f"✓ {mode.label or mode_name}")
     elif clipboard:
         clipboard_write(result)
         if show_notify:
-            notify("txtfmt", f"✓ {mode.label or mode_name}")
+            notify("prosefmt", f"✓ {mode.label or mode_name}")
         click.echo(result)
     else:
         click.echo(result)
@@ -162,7 +162,7 @@ def _resolve_input(text: str | None, clipboard: bool, system: bool) -> str:
         return text
 
     if clipboard or system:
-        from txtfmt.clipboard import clipboard_read
+        from prosefmt.clipboard import clipboard_read
 
         return clipboard_read()
 
@@ -172,8 +172,8 @@ def _resolve_input(text: str | None, clipboard: bool, system: bool) -> str:
     return ""
 
 
-@click.group(cls=TxtfmtCLI, invoke_without_command=True)
-@click.version_option(__version__, prog_name="txtfmt")
+@click.group(cls=ProsefmtCLI, invoke_without_command=True)
+@click.version_option(__version__, prog_name="prosefmt")
 @click.option(
     "--config-path",
     type=click.Path(exists=True, path_type=Path),
@@ -182,17 +182,17 @@ def _resolve_input(text: str | None, clipboard: bool, system: bool) -> str:
 )
 @click.pass_context
 def cli(ctx: click.Context, config_path: Path | None) -> None:
-    """txtfmt — AI-powered text formatting for your terminal.
+    """prosefmt — AI-powered text formatting for your terminal.
 
     \b
     Usage:
-      txtfmt fix "text with erors"          Fix grammar (print to stdout)
-      txtfmt professional --clipboard       Read clipboard, rewrite, write back
-      txtfmt rephrase --system              System-wide: rewrite selected text in-place
-      echo "text" | txtfmt summarize        Pipe mode
-      txtfmt list                           Show available modes
-      txtfmt undo                           Restore original text
-      txtfmt config init                    Create default config file
+      prosefmt fix "text with erors"          Fix grammar (print to stdout)
+      prosefmt professional --clipboard       Read clipboard, rewrite, write back
+      prosefmt rephrase --system              System-wide: rewrite selected text in-place
+      echo "text" | prosefmt summarize        Pipe mode
+      prosefmt list                           Show available modes
+      prosefmt undo                           Restore original text
+      prosefmt config init                    Create default config file
     """
     ctx.ensure_object(dict)
     ctx.obj["config"] = Config.load(config_path)
@@ -219,8 +219,8 @@ def list_modes(ctx: click.Context) -> None:
 @click.pass_context
 def undo(ctx: click.Context, clipboard: bool, system: bool) -> None:
     """Undo the last rewrite — restore the original text."""
-    from txtfmt.core import load_undo
-    from txtfmt.notify import notify
+    from prosefmt.core import load_undo
+    from prosefmt.notify import notify
 
     config: Config = ctx.obj["config"]
     original = load_undo(config.undo_file)
@@ -232,17 +232,17 @@ def undo(ctx: click.Context, clipboard: bool, system: bool) -> None:
     if system:
         import time
 
-        from txtfmt.clipboard import clipboard_write, paste_to_active_window
+        from prosefmt.clipboard import clipboard_write, paste_to_active_window
 
         clipboard_write(original)
         time.sleep(0.1)
         paste_to_active_window()
-        notify("txtfmt", "↩ Reverted to original")
+        notify("prosefmt", "↩ Reverted to original")
     elif clipboard:
-        from txtfmt.clipboard import clipboard_write
+        from prosefmt.clipboard import clipboard_write
 
         clipboard_write(original)
-        notify("txtfmt", "↩ Reverted to original (clipboard)")
+        notify("prosefmt", "↩ Reverted to original (clipboard)")
         click.echo(original)
     else:
         click.echo(original)
@@ -250,14 +250,14 @@ def undo(ctx: click.Context, clipboard: bool, system: bool) -> None:
 
 @cli.group("config")
 def config_group() -> None:
-    """Manage txtfmt configuration."""
+    """Manage prosefmt configuration."""
 
 
 @config_group.command("init")
 def config_init() -> None:
     """Create a default configuration file and check system dependencies."""
-    from txtfmt.clipboard import check_clipboard_tools, install_hints
-    from txtfmt.config import init_config
+    from prosefmt.clipboard import check_clipboard_tools, install_hints
+    from prosefmt.config import init_config
 
     path = init_config()
     click.echo(f"✓ Config file ready: {path}")
@@ -276,7 +276,7 @@ def config_init() -> None:
             click.echo("\n  Install with one of these commands:")
             for line in hints:
                 click.echo(line)
-        click.echo("\n  (Pipe mode — echo 'text' | txtfmt fix — works without these tools.)")
+        click.echo("\n  (Pipe mode — echo 'text' | prosefmt fix — works without these tools.)")
     else:
         click.echo("✓ Clipboard tools installed")
 
@@ -303,8 +303,8 @@ def config_show(ctx: click.Context) -> None:
 @click.pass_context
 def check(ctx: click.Context) -> None:
     """Verify clipboard tools are installed and the AI provider is reachable."""
-    from txtfmt.clipboard import check_clipboard_tools, install_hints
-    from txtfmt.providers import get_provider
+    from prosefmt.clipboard import check_clipboard_tools, install_hints
+    from prosefmt.providers import get_provider
 
     config: Config = ctx.obj["config"]
     ok = True
@@ -340,7 +340,7 @@ def check(ctx: click.Context) -> None:
                 env_var = {
                     "openai": "OPENAI_API_KEY",
                     "anthropic": "ANTHROPIC_API_KEY",
-                    "openai-compat": "TXTFMT_COMPAT_API_KEY",
+                    "openai-compat": "PROSEFMT_COMPAT_API_KEY",
                 }.get(pname, "API key env var")
                 click.echo(
                     f"✗ Provider '{pname}' is not reachable\n"
@@ -350,7 +350,7 @@ def check(ctx: click.Context) -> None:
                 click.echo(f"✗ Provider '{pname}' is not reachable")
             ok = False
     else:
-        click.echo(f"✗ Provider '{pname}' not configured — run: txtfmt config init")
+        click.echo(f"✗ Provider '{pname}' not configured — run: prosefmt config init")
         ok = False
 
     raise SystemExit(0 if ok else 1)

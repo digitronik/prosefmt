@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from txtfmt.config import Config, ModeConfig, ProviderConfig
+from prosefmt.config import Config, ModeConfig, ProviderConfig
 
 
 @pytest.fixture()

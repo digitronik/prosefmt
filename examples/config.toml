@@ -1,7 +1,7 @@
-# txtfmt configuration example
-# Copy to ~/.config/txtfmt/config.toml (or run: txtfmt config init)
+# prosefmt configuration example
+# Copy to ~/.config/prosefmt/config.toml (or run: prosefmt config init)
 #
-# Documentation: https://github.com/digitronik/txtfmt
+# Documentation: https://github.com/digitronik/prosefmt
 
 # Default provider (options: ollama, openai, anthropic, openai-compat)
 default_provider = "ollama"
@@ -17,11 +17,11 @@ url = "http://localhost:11434"
 model = "qwen2.5:1.5b"
 
 [providers.openai]
-# API key: set TXTFMT_OPENAI_API_KEY or OPENAI_API_KEY env var (never put keys in this file)
+# API key: set PROSEFMT_OPENAI_API_KEY or OPENAI_API_KEY env var (never put keys in this file)
 model = "gpt-4o-mini"
 
 [providers.anthropic]
-# API key: set TXTFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
+# API key: set PROSEFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
 model = "claude-haiku-4-5-20251001"
 
 # Use any OpenAI-compatible endpoint (Groq, Together, LM Studio, vLLM, etc.)

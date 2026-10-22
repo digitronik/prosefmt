@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from txtfmt.cli import cli
+from prosefmt.cli import cli
 
 
 @pytest.fixture()
@@ -19,12 +19,12 @@ class TestCLIBasics:
     def test_help(self, runner):
         result = runner.invoke(cli, ["--help"])
         assert result.exit_code == 0
-        assert "txtfmt" in result.output.lower()
+        assert "prosefmt" in result.output.lower()
 
     def test_version(self, runner):
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "txtfmt" in result.output.lower() or result.output.strip()
+        assert "prosefmt" in result.output.lower() or result.output.strip()
 
     def test_no_args_shows_help(self, runner):
         result = runner.invoke(cli, [])
@@ -56,14 +56,14 @@ class TestConfigCommand:
 
 class TestModeCommands:
     def test_fix_with_text(self, runner):
-        with patch("txtfmt.providers.get_provider") as mock_gp:
+        with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Fixed text."
             result = runner.invoke(cli, ["fix", "bad grammer"])
             assert result.exit_code == 0
             assert "Fixed text." in result.output
 
     def test_fix_from_stdin(self, runner):
-        with patch("txtfmt.providers.get_provider") as mock_gp:
+        with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Fixed text."
             result = runner.invoke(cli, ["fix"], input="bad grammer\n")
             assert result.exit_code == 0
@@ -79,7 +79,7 @@ class TestModeCommands:
         assert "no text" in result.output.lower()
 
     def test_provider_override(self, runner):
-        with patch("txtfmt.providers.get_provider") as mock_gp:
+        with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Done."
             result = runner.invoke(cli, ["fix", "--provider", "openai", "text"])
             assert result.exit_code == 0
@@ -89,7 +89,7 @@ class TestModeCommands:
 
 class TestUndoCommand:
     def test_undo_nothing(self, runner):
-        with patch("txtfmt.core.load_undo", return_value=None):
+        with patch("prosefmt.core.load_undo", return_value=None):
             result = runner.invoke(cli, ["undo"])
             assert result.exit_code != 0
             assert "nothing" in result.output.lower()
@@ -97,7 +97,7 @@ class TestUndoCommand:
     def test_undo_after_rewrite(self, runner, tmp_path, monkeypatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
-        with patch("txtfmt.providers.get_provider") as mock_gp:
+        with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Fixed."
             runner.invoke(cli, ["fix", "original text"])
 

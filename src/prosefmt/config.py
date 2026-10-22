@@ -12,7 +12,7 @@ from typing import Any
 
 def _config_dir() -> Path:
     """XDG-compliant config directory."""
-    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "txtfmt"
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "prosefmt"
 
 
 def _config_path() -> Path:
@@ -21,7 +21,7 @@ def _config_path() -> Path:
 
 def _default_undo_file() -> str:
     """Cross-platform temp path for the last-rewrite undo snapshot."""
-    return str(Path(tempfile.gettempdir()) / "txtfmt-undo")
+    return str(Path(tempfile.gettempdir()) / "prosefmt-undo")
 
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -82,7 +82,7 @@ class Config:
 
     def _apply_defaults(self) -> None:
         """Set up default providers and modes."""
-        from txtfmt.modes import BUILTIN_MODES
+        from prosefmt.modes import BUILTIN_MODES
 
         self.providers = {
             "ollama": ProviderConfig(
@@ -139,9 +139,9 @@ class Config:
     def _apply_env(self) -> None:
         """Override API keys from environment variables (never store secrets in config)."""
         env_map = {
-            "openai": ["TXTFMT_OPENAI_API_KEY", "OPENAI_API_KEY"],
-            "anthropic": ["TXTFMT_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"],
-            "openai-compat": ["TXTFMT_COMPAT_API_KEY"],
+            "openai": ["PROSEFMT_OPENAI_API_KEY", "OPENAI_API_KEY"],
+            "anthropic": ["PROSEFMT_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"],
+            "openai-compat": ["PROSEFMT_COMPAT_API_KEY"],
         }
         for pname, env_vars in env_map.items():
             if pname in self.providers:
@@ -164,7 +164,7 @@ def init_config() -> Path:
 
 
 _DEFAULT_CONFIG_CONTENT = """\
-# txtfmt configuration — https://github.com/digitronik/txtfmt
+# prosefmt configuration — https://github.com/digitronik/prosefmt
 #
 # Default provider (options: ollama, openai, anthropic, openai-compat)
 default_provider = "ollama"
@@ -179,11 +179,11 @@ url = "http://localhost:11434"
 model = "qwen2.5:1.5b"
 
 [providers.openai]
-# API key: set TXTFMT_OPENAI_API_KEY or OPENAI_API_KEY env var
+# API key: set PROSEFMT_OPENAI_API_KEY or OPENAI_API_KEY env var
 model = "gpt-4o-mini"
 
 [providers.anthropic]
-# API key: set TXTFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
+# API key: set PROSEFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
 model = "claude-haiku-4-5-20251001"
 
 # [providers.openai-compat]
