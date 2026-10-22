@@ -1,6 +1,6 @@
 # Reword
 
-> AI-powered text rewriter for your terminal.  
+> AI-powered text rewriter for your terminal.
 > Fix grammar, rephrase, summarize — in any app, with one command.
 
 [![CI](https://github.com/digitronik/reword/actions/workflows/ci.yml/badge.svg)](https://github.com/digitronik/reword/actions/workflows/ci.yml)
@@ -451,12 +451,12 @@ git clone https://github.com/digitronik/reword.git
 cd reword
 uv sync --extra dev
 
+# Git hooks (ruff + file hygiene) — uses .pre-commit-config.yaml
+uv run pre-commit install
+uv run pre-commit run --all-files   # once, to verify hooks
+
 # Run tests
 uv run pytest -v
-
-# Lint + format
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
 ```
 
 Contributions welcome — open an issue or pull request on GitHub.

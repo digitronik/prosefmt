@@ -163,9 +163,7 @@ def install_hints() -> list[str]:
             ]
 
     elif plat == Platform.LINUX_WAYLAND:
-        wl_pkg = " ".join(
-            t for t in ("wl-copy", "wl-paste") if not shutil.which(t)
-        )
+        wl_pkg = " ".join(t for t in ("wl-copy", "wl-paste") if not shutil.which(t))
         # wl-clipboard ships both wl-copy and wl-paste
         if wl_pkg:
             hints += [
