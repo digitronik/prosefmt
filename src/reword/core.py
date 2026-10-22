@@ -51,14 +51,16 @@ def rewrite(text: str, mode: ModeConfig, *, provider: Provider, config: Config) 
 
 def save_undo(text: str, undo_path: str) -> None:
     """Save the original text so it can be restored later."""
-    Path(undo_path).write_text(text)
+    p = Path(undo_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(text, encoding="utf-8")
 
 
 def load_undo(undo_path: str) -> str | None:
     """Load the saved original text, or None if nothing to undo."""
     p = Path(undo_path)
     if p.exists():
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         p.unlink()
         return text
     return None
