@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,11 @@ def _config_dir() -> Path:
 
 def _config_path() -> Path:
     return _config_dir() / "config.toml"
+
+
+def _default_undo_file() -> str:
+    """Cross-platform temp path for the last-rewrite undo snapshot."""
+    return str(Path(tempfile.gettempdir()) / "reword-undo")
 
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -57,7 +63,7 @@ class Config:
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     modes: dict[str, ModeConfig] = field(default_factory=dict)
-    undo_file: str = "/tmp/reword-undo"
+    undo_file: str = field(default_factory=_default_undo_file)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
