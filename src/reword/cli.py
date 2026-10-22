@@ -261,7 +261,7 @@ def config_init() -> None:
 
     path = init_config()
     click.echo(f"✓ Config file ready: {path}")
-    click.echo(f"  Edit it to set your provider, model, and custom modes.\n")
+    click.echo("  Edit it to set your provider, model, and custom modes.\n")
 
     missing = check_clipboard_tools()
     if missing:
@@ -276,9 +276,7 @@ def config_init() -> None:
             click.echo("\n  Install with one of these commands:")
             for line in hints:
                 click.echo(line)
-        click.echo(
-            "\n  (Pipe mode — echo 'text' | reword fix — works without these tools.)"
-        )
+        click.echo("\n  (Pipe mode — echo 'text' | reword fix — works without these tools.)")
     else:
         click.echo("✓ Clipboard tools installed")
 
