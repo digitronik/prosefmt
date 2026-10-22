@@ -1,6 +1,6 @@
 """Tests for modes and list-structure preservation."""
 
-from txtfmt.modes import (
+from prosefmt.modes import (
     BUILTIN_MODES,
     has_list_structure,
     restore_list_prefixes,

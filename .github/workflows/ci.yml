@@ -54,7 +54,7 @@ jobs:
         run: uv sync --extra dev
 
       - name: Run tests
-        run: uv run pytest --cov=txtfmt --cov-report=xml --cov-report=term -v
+        run: uv run pytest --cov=prosefmt --cov-report=xml --cov-report=term -v
 
       - name: Upload coverage
         if: matrix.python-version == '3.13' && matrix.os == 'ubuntu-latest'

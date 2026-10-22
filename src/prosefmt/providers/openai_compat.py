@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from txtfmt.providers.base import ProviderError
+from prosefmt.providers.base import ProviderError
 
 
 class OpenAICompatProvider:
