@@ -202,10 +202,22 @@ def cli(ctx: click.Context, config_path: Path | None) -> None:
 
 
 @cli.command("list")
+@click.option(
+    "--names",
+    "-n",
+    is_flag=True,
+    help="Print mode names only (one per line), for dmenu/rofi pickers.",
+)
 @click.pass_context
-def list_modes(ctx: click.Context) -> None:
+def list_modes(ctx: click.Context, names: bool) -> None:
     """List all available rewrite modes."""
     config: Config = ctx.obj["config"]
+
+    if names:
+        for name in config.modes:
+            click.echo(name)
+        return
+
     max_name = max(len(n) for n in config.modes)
 
     for name, mode in config.modes.items():

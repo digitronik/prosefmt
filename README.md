@@ -1,22 +1,31 @@
 # prosefmt
 
-> AI-powered text formatting for your terminal.
-> Fix grammar, rephrase, summarize — in any app, with one command.
+> Rewrite text in any app — press a hotkey, get polished prose back.
 
 [![CI](https://github.com/digitronik/prosefmt/actions/workflows/ci.yml/badge.svg)](https://github.com/digitronik/prosefmt/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/prosefmt)](https://pypi.org/project/prosefmt/)
 [![Python](https://img.shields.io/pypi/pyversions/prosefmt)](https://pypi.org/project/prosefmt/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+<!-- TODO: Add demo.gif here — screen recording of: highlight text in a browser/Slack/email → press Mod+G → text rewrites in place -->
+
+Highlight text in any application — browser, email, Slack, VS Code, anything — press your hotkey,
+and prosefmt silently rewrites it and pastes the result back. Grammar fixed, tone shifted, fully
+rephrased: all without leaving the app you are in.
+
+It also works as a standard CLI tool that composes with pipes and scripts.
+
 ```
 $ prosefmt fix "i can haz good grammer?"
 I can have good grammar?
 
-$ echo "This is a very long sentence that just keeps going" | prosefmt concise
-This sentence is too long.
+$ echo "this sentense has a typo" | prosefmt fix
+This sentence has a typo.
 
 $ prosefmt professional --clipboard    # reads clipboard → rewrites → writes back
 ```
+
+→ **[Jump to hotkey setup ↓](#system-wide-hotkeys)**
 
 ---
 
@@ -30,10 +39,10 @@ $ prosefmt professional --clipboard    # reads clipboard → rewrites → writes
   - [Step 3 — Create your config](#step-3--create-your-config)
   - [Step 4 — Verify everything works](#step-4--verify-everything-works)
   - [Step 5 — Try it out](#step-5--try-it-out)
-- [Built-in Modes](#built-in-modes)
-- [Configuration Reference](#configuration-reference)
-- [Custom Modes](#custom-modes)
 - [System-Wide Hotkeys](#system-wide-hotkeys)
+- [Built-in Modes](#built-in-modes)
+- [Custom Modes](#custom-modes)
+- [Configuration Reference](#configuration-reference)
 - [Commands](#commands)
 - [Development](#development)
 
@@ -41,16 +50,18 @@ $ prosefmt professional --clipboard    # reads clipboard → rewrites → writes
 
 ## Why prosefmt?
 
-Every existing tool in this space (WritingTools, GhostEdit, ZyntaxAI…) is a **GUI desktop app** — Electron, Tauri, or PyQt5. They're 100–200 MB, framework-dependent, and impossible to script.
+Every existing tool in this space is a **GUI desktop app** —
+Electron, Tauri, or PyQt5. They are 100–200 MB, framework-dependent, and impossible to script.
 
-prosefmt is a plain CLI tool: two dependencies, composes with pipes, works from hotkeys or scripts, and runs on every OS.
+prosefmt is a plain CLI tool: two Python dependencies, composes with pipes, works from hotkeys or
+scripts, and runs on every OS.
 
 | | **prosefmt** | GUI tools |
 |---|---|---|
 | Size | ~2 Python deps | 100–200 MB runtime |
 | Composability | Pipes, scripts, automation | GUI click-through only |
 | Providers | Ollama, OpenAI, Anthropic, any OpenAI-compat | Varies |
-| Custom modes | Add one line to a config file | Fork the source |
+| Custom modes | One line in a config file | Fork the source |
 | Hotkey integration | Any window manager or OS shortcut | Their own UI |
 
 ---
@@ -75,9 +86,8 @@ Follow these steps once after installing. This takes about 5 minutes.
 
 ### Step 1 — Install clipboard tools
 
-prosefmt uses your system's clipboard to read and paste text. The tools needed
-depend on your OS. **macOS and Windows users can skip this step** — everything
-is built in.
+prosefmt uses your system clipboard to read and paste text. The tools needed depend on your OS.
+**macOS and Windows users can skip this step** — everything is built in.
 
 **Linux (X11 — most desktops: GNOME, KDE, i3, XFCE, …)**
 
@@ -111,8 +121,7 @@ sudo pacman -S wl-clipboard wtype
 sudo zypper install wl-clipboard wtype
 ```
 
-> **Not sure if you're on X11 or Wayland?** Run `echo $XDG_SESSION_TYPE` — it
-> prints `x11` or `wayland`.
+> **Not sure if you are on X11 or Wayland?** Run `echo $XDG_SESSION_TYPE` — it prints `x11` or `wayland`.
 
 **macOS** — nothing to install. `pbcopy`, `pbpaste`, and `osascript` are built in.
 
@@ -149,7 +158,7 @@ export OPENAI_API_KEY="sk-..."
 ```
 
 Add to your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`)
-so it's always available:
+so it is always available:
 
 ```bash
 echo 'export OPENAI_API_KEY="sk-..."' >> ~/.bashrc
@@ -163,23 +172,22 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 #### Option D — Any OpenAI-compatible endpoint
 
-Works with Groq, Together AI, LM Studio, vLLM, and any server that speaks
-the `/v1/chat/completions` format. Configure the URL and model in your config
-file (see [Step 3](#step-3--create-your-config)).
+Works with Groq, Together AI, LM Studio, vLLM, and any server that speaks the
+`/v1/chat/completions` format. Configure the URL and model in your config file
+(see [Step 3](#step-3--create-your-config)).
 
 ---
 
 ### Step 3 — Create your config
 
-Run this once to create a ready-to-edit config file at
-`~/.config/prosefmt/config.toml`:
+Run this once to create a ready-to-edit config file:
 
 ```bash
 prosefmt config init
 ```
 
-It will also check whether your clipboard tools from Step 1 are installed and
-tell you exactly what to run if anything is missing.
+It also checks whether your clipboard tools from Step 1 are installed and tells you exactly what
+to run if anything is missing.
 
 Open the file to set your default provider and model:
 
@@ -191,8 +199,8 @@ nano ~/.config/prosefmt/config.toml    # or: code, vim, whatever you prefer
 notepad %APPDATA%\prosefmt\config.toml
 ```
 
-The minimum config for Ollama looks like this — the defaults already cover it,
-so you may not need to change anything:
+The minimum config for Ollama — the defaults already cover this, so you may not need to change
+anything:
 
 ```toml
 default_provider = "ollama"
@@ -251,6 +259,174 @@ prosefmt fix --system
 
 ---
 
+## System-Wide Hotkeys
+
+The `--system` flag is what makes prosefmt useful beyond the terminal. Highlight any text, press
+your hotkey, and the rewritten version is pasted back automatically — without touching the mouse
+or switching windows.
+
+Two bindings are recommended:
+
+| Hotkey | Action |
+|:---|:---|
+| `Mod+G` | Fix grammar immediately — no prompt |
+| `Mod+Shift+G` | Open a mode picker — choose fix / professional / casual / rephrase / … |
+
+---
+
+### Linux — i3wm / Sway
+
+Install [rofi](https://github.com/davatorium/rofi) if you do not have it already:
+
+```bash
+sudo dnf install rofi   # Fedora
+sudo apt install rofi   # Debian / Ubuntu
+sudo pacman -S rofi     # Arch
+```
+
+Create the mode picker script at `~/.config/prosefmt/prosefmt-menu.sh`:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+PROMPT=$'\uf044'" prosefmt"
+choice=$(prosefmt list --names | rofi -dmenu -i -p "$PROMPT" -theme-str 'window {width: 28%;}')
+[[ -z "$choice" ]] && exit 0
+exec prosefmt "$choice" --system --notify
+```
+
+```bash
+chmod +x ~/.config/prosefmt/prosefmt-menu.sh
+```
+
+Add to `~/.config/i3/config` (or `~/.config/sway/config`):
+
+```
+bindsym $mod+g       exec --no-startup-id prosefmt fix --system --notify
+bindsym $mod+Shift+g exec --no-startup-id ~/.config/prosefmt/prosefmt-menu.sh
+```
+
+Reload i3 with `Mod+Shift+C`.
+
+---
+
+### Linux — Hyprland
+
+Install **wofi** (Wayland-native picker) or **rofi** (also supports Wayland on modern builds):
+
+```bash
+sudo dnf install wofi   # Fedora
+sudo apt install wofi   # Debian / Ubuntu
+sudo pacman -S wofi     # Arch
+```
+
+Create the mode picker script at `~/.config/prosefmt/prosefmt-menu.sh`:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+# Use wofi if available, otherwise fall back to rofi
+if command -v wofi &>/dev/null; then
+    choice=$(prosefmt list --names | wofi --dmenu --prompt "prosefmt")
+else
+    choice=$(prosefmt list --names | rofi -dmenu -i -p "prosefmt")
+fi
+[[ -z "$choice" ]] && exit 0
+exec prosefmt "$choice" --system --notify
+```
+
+```bash
+chmod +x ~/.config/prosefmt/prosefmt-menu.sh
+```
+
+Add to `~/.config/hypr/hyprland.conf`:
+
+```
+bind = $mainMod,       G, exec, prosefmt fix --system --notify
+bind = $mainMod SHIFT, G, exec, ~/.config/prosefmt/prosefmt-menu.sh
+```
+
+---
+
+### Linux — GNOME / KDE (any desktop)
+
+rofi works on GNOME and KDE too — install it and use the same script from the i3wm section above.
+Then add the shortcuts in **Settings → Keyboard → Custom Shortcuts**:
+
+| Name | Command | Shortcut |
+|:---|:---|:---|
+| prosefmt fix | `prosefmt fix --system --notify` | `Super+G` |
+| prosefmt mode picker | `~/.config/prosefmt/prosefmt-menu.sh` | `Super+Shift+G` |
+
+---
+
+### macOS — Hammerspoon
+
+[Hammerspoon](https://www.hammerspoon.org) provides both the hotkey binding and a built-in
+chooser for the mode picker. Add to `~/.hammerspoon/init.lua`:
+
+```lua
+-- Grammar fix
+hs.hotkey.bind({"cmd"}, "g", function()
+  hs.task.new("/usr/local/bin/prosefmt", nil, {"fix", "--system", "--notify"}):start()
+end)
+
+-- Mode picker — opens Hammerspoon's native chooser
+hs.hotkey.bind({"cmd", "shift"}, "g", function()
+  hs.task.new("/usr/local/bin/prosefmt", function(_, stdout)
+    local choices = {}
+    for line in stdout:gmatch("[^\n]+") do
+      table.insert(choices, { text = line })
+    end
+    local chooser = hs.chooser.new(function(choice)
+      if choice then
+        hs.task.new("/usr/local/bin/prosefmt", nil,
+          {choice.text, "--system", "--notify"}):start()
+      end
+    end)
+    chooser:choices(choices)
+    chooser:show()
+  end, {"list", "--names"}):start()
+end)
+```
+
+Reload the Hammerspoon config from the menu bar icon.
+
+---
+
+### macOS — Automator / Shortcuts app
+
+For a fix-only binding without Hammerspoon, create a **Quick Action** in Automator that runs:
+
+```bash
+/usr/local/bin/prosefmt fix --system --notify
+```
+
+Assign it a keyboard shortcut in **System Settings → Keyboard → Keyboard Shortcuts → Services**.
+
+---
+
+### Windows — AutoHotkey v2
+
+Create `prosefmt-menu.ps1` anywhere on your system (for example `%USERPROFILE%\prosefmt-menu.ps1`):
+
+```powershell
+# prosefmt-menu.ps1
+$modes = (& prosefmt list --names) -split "`n" | Where-Object { $_ }
+$mode  = $modes | Out-GridView -Title "prosefmt — choose a mode" -PassThru
+if ($mode) { & prosefmt $mode --system --notify }
+```
+
+Add to your AutoHotkey v2 script:
+
+```ahk
+; prosefmt.ahk
+#g::  Run "prosefmt fix --system --notify",, "Hide"
+#+g:: Run 'powershell -WindowStyle Hidden -File "%USERPROFILE%\prosefmt-menu.ps1"',, "Hide"
+```
+
+---
+
 ## Built-in Modes
 
 | Mode | What it does |
@@ -264,7 +440,43 @@ prosefmt fix --system
 | `summarize` | Condense to the key points |
 | `email` | Format as a professional email with greeting and sign-off |
 
-Run `prosefmt list` to see all modes including any custom ones you've added.
+Run `prosefmt list` to see all modes including any custom ones you have added.
+
+---
+
+## Custom Modes
+
+Add any number of custom modes to your config file:
+
+```toml
+# ~/.config/prosefmt/config.toml
+
+[modes.translate-spanish]
+prompt = "Translate to Spanish. Keep technical terms in English."
+label  = "Translated to Spanish"
+
+[modes.code-comments]
+prompt             = "Add clear, concise comments to this code. Do not change the code itself."
+label              = "Comments added"
+preserve_structure = false
+
+[modes.slack]
+prompt = "Rewrite for Slack: brief, friendly, one or two sentences max. No formal sign-off."
+label  = "Slack-ready"
+
+[modes.eli5]
+prompt = "Explain this like I'm five — simple words, short sentences, no jargon."
+label  = "Simplified"
+```
+
+Use them exactly like built-in modes:
+
+```bash
+prosefmt translate-spanish "Good morning, how are you?"
+prosefmt slack "Please review the pull request I opened for the authentication refactor."
+```
+
+Custom modes appear automatically in the mode picker — no changes to your hotkey scripts needed.
 
 ---
 
@@ -323,102 +535,8 @@ model = "claude-haiku-4-5-20251001"
 | Anthropic | `PROSEFMT_ANTHROPIC_API_KEY` or `ANTHROPIC_API_KEY` |
 | OpenAI-compat | `PROSEFMT_COMPAT_API_KEY` |
 
-Add them to your shell profile (`~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`)
-so they load automatically in every session.
-
----
-
-## Custom Modes
-
-Add any number of custom modes to your config file:
-
-```toml
-# ~/.config/prosefmt/config.toml
-
-[modes.translate-spanish]
-prompt = "Translate to Spanish. Keep technical terms in English."
-label  = "Translated to Spanish"
-
-[modes.code-comments]
-prompt             = "Add clear, concise comments to this code. Do not change the code itself."
-label              = "Comments added"
-preserve_structure = false
-
-[modes.slack]
-prompt = "Rewrite for Slack: brief, friendly, one or two sentences max. No formal sign-off."
-label  = "Slack-ready"
-
-[modes.eli5]
-prompt = "Explain this like I'm five — simple words, short sentences, no jargon."
-label  = "Simplified"
-```
-
-Use them exactly like built-in modes:
-
-```bash
-prosefmt translate-spanish "Good morning, how are you?"
-prosefmt slack "Please review the pull request I opened for the authentication refactor."
-```
-
----
-
-## System-Wide Hotkeys
-
-The `--system` flag reads your selected text from any app, rewrites it, and
-pastes the result back in-place. Bind it to a hotkey for a seamless workflow.
-
-### Linux — i3wm / Sway
-
-```
-# ~/.config/i3/config (or ~/.config/sway/config)
-bindsym $mod+g       exec --no-startup-id prosefmt fix --system --notify
-bindsym $mod+Shift+g exec --no-startup-id \
-    prosefmt list | rofi -dmenu -p "prosefmt mode" | xargs -r -I{} prosefmt {} --system --notify
-```
-
-### Linux — Hyprland
-
-```
-# ~/.config/hypr/hyprland.conf
-bind = $mainMod, G, exec, prosefmt fix --system --notify
-```
-
-### Linux — GNOME / KDE (any desktop)
-
-Go to **Settings → Keyboard → Custom Shortcuts** and add:
-
-| Name | Command | Shortcut |
-|:---|:---|:---|
-| prosefmt fix | `prosefmt fix --system --notify` | `Super+G` |
-| prosefmt fix | `prosefmt fix --system --notify` | `Super+G` |
-
-### macOS — Hammerspoon
-
-```lua
--- ~/.hammerspoon/init.lua
-hs.hotkey.bind({"cmd"}, "g", function()
-  hs.task.new("/usr/local/bin/prosefmt", nil, {"fix", "--system", "--notify"}):start()
-end)
-```
-
-### macOS — Automator / Shortcuts app
-
-Create a **Quick Action** in Automator that runs a shell script:
-
-```bash
-/usr/local/bin/prosefmt fix --system --notify
-```
-
-Assign it a keyboard shortcut in **System Settings → Keyboard → Keyboard Shortcuts → Services**.
-
-### Windows — AutoHotkey v2
-
-```ahk
-; prosefmt.ahk
-#g:: {
-    Run "prosefmt fix --system --notify", , "Hide"
-}
-```
+Add them to your shell profile (`~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`) so they
+load automatically in every session.
 
 ---
 
@@ -432,7 +550,8 @@ prosefmt <mode> --provider P   Override the AI provider for this run
 prosefmt <mode> --model M      Override the model for this run
 prosefmt <mode> --notify       Show a desktop notification when done
 
-prosefmt list                  List all available modes
+prosefmt list                  List all available modes (human-readable)
+prosefmt list --names          Mode names only — used by hotkey picker scripts
 prosefmt undo                  Restore the original text from the last rewrite
 prosefmt check                 Check clipboard tools and provider connectivity
 prosefmt config init           Create ~/.config/prosefmt/config.toml

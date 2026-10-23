@@ -40,6 +40,15 @@ class TestListCommand:
         assert "professional" in result.output
         assert "summarize" in result.output
 
+    def test_list_names(self, runner):
+        result = runner.invoke(cli, ["list", "--names"])
+        assert result.exit_code == 0
+        lines = result.output.strip().splitlines()
+        assert lines
+        assert all(" " not in line and ":" not in line for line in lines)
+        assert lines[0] == "fix"
+        assert "summarize" in lines
+
 
 class TestConfigCommand:
     def test_config_show(self, runner):
