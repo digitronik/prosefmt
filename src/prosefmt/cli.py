@@ -96,7 +96,8 @@ def _run_rewrite(
     model_override: str | None,
     show_notify: bool,
 ) -> None:
-    from prosefmt.clipboard import clipboard_write, paste_to_active_window
+    from dataclasses import replace
+
     from prosefmt.core import ProsefmtError, rewrite, save_undo
     from prosefmt.notify import notify
     from prosefmt.providers import ProviderError, get_provider
@@ -114,15 +115,19 @@ def _run_rewrite(
         raise SystemExit(1)
 
     if model_override:
-        pconfig.model = model_override
+        pconfig = replace(pconfig, model=model_override)
 
     input_text = _resolve_input(text, clipboard, system)
     if not input_text:
-        click.echo(
-            "Error: no text provided — pass as argument, pipe via stdin, "
-            "or use --clipboard / --system",
-            err=True,
+        msg = (
+            "No text selected — highlight text before pressing the hotkey"
+            if system
+            else "No text provided — pass as argument, pipe via stdin, "
+            "or use --clipboard / --system"
         )
+        if show_notify:
+            notify("prosefmt", f"✗ {msg}", urgency="critical")
+        click.echo(f"Error: {msg}", err=True)
         raise SystemExit(1)
 
     if show_notify:
@@ -140,14 +145,17 @@ def _run_rewrite(
     save_undo(input_text, config.undo_file)
 
     if system:
-        import time
+        from prosefmt.clipboard import clipboard_write, paste_to_active_window, preserve_clipboard
 
-        clipboard_write(result)
-        time.sleep(0.1)
-        paste_to_active_window()
+        with preserve_clipboard():
+            clipboard_write(result)
+            paste_to_active_window()
+
         if show_notify:
             notify("prosefmt", f"✓ {mode.label or mode_name}")
     elif clipboard:
+        from prosefmt.clipboard import clipboard_write
+
         clipboard_write(result)
         if show_notify:
             notify("prosefmt", f"✓ {mode.label or mode_name}")
@@ -157,14 +165,24 @@ def _run_rewrite(
 
 
 def _resolve_input(text: str | None, clipboard: bool, system: bool) -> str:
-    """Figure out where the input text comes from."""
+    """Figure out where the input text comes from.
+
+    ``--system``    reads the **primary** selection (highlighted text).
+    ``--clipboard`` reads the **clipboard** selection (Ctrl+C buffer).
+    On macOS / Windows both resolve to the single system clipboard.
+    """
     if text:
         return text
 
-    if clipboard or system:
+    if system:
         from prosefmt.clipboard import clipboard_read
 
-        return clipboard_read()
+        return clipboard_read(selection="primary")
+
+    if clipboard:
+        from prosefmt.clipboard import clipboard_read
+
+        return clipboard_read(selection="clipboard")
 
     if not sys.stdin.isatty():
         return sys.stdin.read()
@@ -242,13 +260,12 @@ def undo(ctx: click.Context, clipboard: bool, system: bool) -> None:
         raise SystemExit(1)
 
     if system:
-        import time
+        from prosefmt.clipboard import clipboard_write, paste_to_active_window, preserve_clipboard
 
-        from prosefmt.clipboard import clipboard_write, paste_to_active_window
+        with preserve_clipboard():
+            clipboard_write(original)
+            paste_to_active_window()
 
-        clipboard_write(original)
-        time.sleep(0.1)
-        paste_to_active_window()
         notify("prosefmt", "↩ Reverted to original")
     elif clipboard:
         from prosefmt.clipboard import clipboard_write

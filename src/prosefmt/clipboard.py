@@ -1,10 +1,10 @@
-"""Cross-platform clipboard and paste-back helpers.
+"""Cross-platform clipboard helpers with save/restore support.
 
 No external Python dependencies — uses platform-native CLI tools:
-  Linux (X11):    xclip / xdotool
+  Linux (X11):     xclip / xdotool
   Linux (Wayland): wl-copy / wl-paste / wtype
-  macOS:          pbcopy / pbpaste / osascript
-  Windows:        PowerShell clip.exe / Get-Clipboard
+  macOS:           pbcopy / pbpaste / osascript
+  Windows:         PowerShell clip.exe / Get-Clipboard
 """
 
 from __future__ import annotations
@@ -14,6 +14,9 @@ import platform
 import shutil
 import subprocess
 import sys
+import time
+from collections.abc import Generator
+from contextlib import contextmanager
 from enum import Enum, auto
 
 
@@ -39,19 +42,29 @@ def detect_platform() -> Platform:
     return Platform.UNKNOWN
 
 
-def clipboard_read() -> str:
-    """Read text from the system clipboard."""
+# ---------------------------------------------------------------------------
+# Read
+# ---------------------------------------------------------------------------
+
+
+def clipboard_read(selection: str = "auto") -> str:
+    """Read text from the system clipboard.
+
+    Args:
+        selection: Which buffer to read on Linux.
+            ``"auto"``      — primary first, fall back to clipboard (default)
+            ``"primary"``   — primary selection only (highlighted text)
+            ``"clipboard"`` — clipboard selection only (Ctrl+C buffer)
+
+            On macOS / Windows the parameter is ignored (single clipboard).
+    """
     plat = detect_platform()
 
     if plat == Platform.LINUX_X11:
-        for sel in ("primary", "clipboard"):
-            text = _run_stdout(["xclip", "-o", "-selection", sel])
-            if text:
-                return text
-        return ""
+        return _x11_read(selection)
 
     if plat == Platform.LINUX_WAYLAND:
-        return _run_stdout(["wl-paste", "--no-newline"])
+        return _wayland_read(selection)
 
     if plat == Platform.MACOS:
         return _run_stdout(["pbpaste"])
@@ -62,8 +75,38 @@ def clipboard_read() -> str:
     return ""
 
 
+def _x11_read(selection: str) -> str:
+    if selection == "primary":
+        return _run_stdout(["xclip", "-o", "-selection", "primary"])
+    if selection == "clipboard":
+        return _run_stdout(["xclip", "-o", "-selection", "clipboard"])
+    # auto — try primary (highlighted text) first, fall back to clipboard
+    for sel in ("primary", "clipboard"):
+        text = _run_stdout(["xclip", "-o", "-selection", sel])
+        if text:
+            return text
+    return ""
+
+
+def _wayland_read(selection: str) -> str:
+    if selection == "primary":
+        return _run_stdout(["wl-paste", "--primary", "--no-newline"])
+    if selection == "clipboard":
+        return _run_stdout(["wl-paste", "--no-newline"])
+    # auto — try primary first, fall back to clipboard
+    text = _run_stdout(["wl-paste", "--primary", "--no-newline"])
+    if text:
+        return text
+    return _run_stdout(["wl-paste", "--no-newline"])
+
+
+# ---------------------------------------------------------------------------
+# Write
+# ---------------------------------------------------------------------------
+
+
 def clipboard_write(text: str) -> None:
-    """Write text to the system clipboard."""
+    """Write text to the system clipboard (Ctrl+C buffer)."""
     plat = detect_platform()
 
     if plat == Platform.LINUX_X11:
@@ -80,6 +123,11 @@ def clipboard_write(text: str) -> None:
 
     else:
         print(text, file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Paste
+# ---------------------------------------------------------------------------
 
 
 def paste_to_active_window() -> None:
@@ -117,6 +165,40 @@ def paste_to_active_window() -> None:
             check=False,
             capture_output=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# Save / Restore  (context manager)
+# ---------------------------------------------------------------------------
+
+_PASTE_SETTLE_SECS = 0.15
+
+
+@contextmanager
+def preserve_clipboard() -> Generator[None, None, None]:
+    """Save the clipboard, yield, then restore it.
+
+    Wrap the write → paste sequence so the user's Ctrl+C buffer survives::
+
+        with preserve_clipboard():
+            clipboard_write(new_text)
+            paste_to_active_window()
+
+    On exit the context manager waits briefly for the target application to
+    process the paste, then writes the old clipboard content back.
+    """
+    saved = clipboard_read(selection="clipboard")
+    try:
+        yield
+    finally:
+        if saved:
+            time.sleep(_PASTE_SETTLE_SECS)
+            clipboard_write(saved)
+
+
+# ---------------------------------------------------------------------------
+# Tool checks
+# ---------------------------------------------------------------------------
 
 
 def check_clipboard_tools() -> list[str]:
@@ -164,7 +246,6 @@ def install_hints() -> list[str]:
 
     elif plat == Platform.LINUX_WAYLAND:
         wl_pkg = " ".join(t for t in ("wl-copy", "wl-paste") if not shutil.which(t))
-        # wl-clipboard ships both wl-copy and wl-paste
         if wl_pkg:
             hints += [
                 "  # Debian / Ubuntu / Mint:   sudo apt install wl-clipboard",
@@ -182,6 +263,11 @@ def install_hints() -> list[str]:
             ]
 
     return hints
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
 def _run_stdout(cmd: list[str]) -> str:
