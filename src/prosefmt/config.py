@@ -129,7 +129,9 @@ class Config:
                 if "api_key" in pdata:
                     pc.api_key = pdata["api_key"]
             else:
-                self.providers[pname] = ProviderConfig(name=pname, **pdata)
+                known_fields = {"url", "model", "api_key"}
+                filtered = {k: v for k, v in pdata.items() if k in known_fields}
+                self.providers[pname] = ProviderConfig(name=pname, **filtered)
 
         for mname, mdata in raw.get("modes", {}).items():
             # preserve_structure default: False for summarize/email, True otherwise

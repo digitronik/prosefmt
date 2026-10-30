@@ -50,6 +50,8 @@ class OpenAICompatProvider:
             ) from exc
         except httpx.ConnectError as exc:
             raise ProviderError(f"Cannot connect to {self.url}") from exc
+        except httpx.TimeoutException as exc:
+            raise ProviderError(f"Request to {self.url} timed out") from exc
 
         data = resp.json()
         try:

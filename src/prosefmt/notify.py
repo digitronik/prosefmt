@@ -36,7 +36,10 @@ def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int 
             subprocess.run(cmd, check=False, capture_output=True)
 
         elif plat == Platform.MACOS:
-            script = f'display notification "{_esc(body)}" with title "{_esc(title)}"'
+            script = (
+                f'display notification "{_esc_applescript(body)}"'
+                f' with title "{_esc_applescript(title)}"'
+            )
             subprocess.run(["osascript", "-e", script], check=False, capture_output=True)
 
         elif plat == Platform.WINDOWS:
@@ -44,7 +47,7 @@ def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int 
                 "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, "
                 "ContentType = WindowsRuntime] > $null; "
                 f'$xml = "<toast><visual><binding template=\\"ToastText02\\"><text id=\\"1\\">'
-                f'{_esc(title)}</text><text id=\\"2\\">{_esc(body)}</text>'
+                f'{_esc_xml(title)}</text><text id=\\"2\\">{_esc_xml(body)}</text>'
                 '</binding></visual></toast>"; '
                 "$t = New-Object Windows.Data.Xml.Dom.XmlDocument; $t.LoadXml($xml); "
                 "[Windows.UI.Notifications.ToastNotificationManager]::"
@@ -60,8 +63,20 @@ def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int 
         _stderr_fallback(title, body)
 
 
-def _esc(s: str) -> str:
-    return s.replace('"', '\\"').replace("\n", " ")
+def _esc_applescript(s: str) -> str:
+    """Escape for AppleScript string interpolation."""
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+
+
+def _esc_xml(s: str) -> str:
+    """Escape for XML text content (Windows toast notifications)."""
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("\n", " ")
+    )
 
 
 def _stderr_fallback(title: str, body: str) -> None:
