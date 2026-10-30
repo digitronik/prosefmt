@@ -143,9 +143,17 @@ def paste_to_active_window() -> None:
 
     elif plat == Platform.LINUX_WAYLAND:
         if shutil.which("wtype"):
-            subprocess.run(["wtype", "-M", "ctrl", "v", "-m", "ctrl"], check=False)
+            subprocess.run(
+                ["wtype", "-M", "ctrl", "v", "-m", "ctrl"],
+                check=False,
+                capture_output=True,
+            )
         elif shutil.which("ydotool"):
-            subprocess.run(["ydotool", "key", "29:1", "47:1", "47:0", "29:0"], check=False)
+            subprocess.run(
+                ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
+                check=False,
+                capture_output=True,
+            )
 
     elif plat == Platform.MACOS:
         applescript = 'tell application "System Events" to keystroke "v" using command down'

@@ -265,6 +265,30 @@ def _run_rewrite(
     save_undo(input_text, config.undo_file)
 
     # ------------------------------------------------------------------
+    # Output routing
+    #
+    # Priority: explicit CLI flags  >  mode.default_output  >  stdout
+    #
+    # --popup flag    → always show popup
+    # --system        → use mode's default_output
+    # --clipboard     → write to clipboard
+    # --diff flag     → forces stdout (never silently replace)
+    # otherwise       → stdout
+    # ------------------------------------------------------------------
+    if popup:
+        output = "popup"
+    elif show_diff and system:
+        # User wants to SEE the diff — don't silently replace in-place.
+        # Still perform the rewrite (result is ready), but show diff on stdout.
+        output = "stdout"
+    elif system:
+        output = mode.default_output  # "replace" | "popup" | "clipboard"
+    elif clipboard:
+        output = "clipboard"
+    else:
+        output = "stdout"
+
+    # ------------------------------------------------------------------
     # Diff formatting (applied before output routing)
     # ------------------------------------------------------------------
     display_text = result
@@ -272,31 +296,12 @@ def _run_rewrite(
         from prosefmt.diff import format_diff, has_changes
 
         if has_changes(input_text, result):
-            # Detect if output goes to a terminal (for colour support)
-            use_color = sys.stdout.isatty()
+            # Disable colour when output goes to a popup (ANSI codes
+            # render as garbage in zenity / yad / rofi / kdialog).
+            use_color = output != "popup" and sys.stdout.isatty()
             display_text = format_diff(input_text, result, color=use_color)
         else:
             display_text = "(no changes)"
-
-    # ------------------------------------------------------------------
-    # Output routing
-    #
-    # Priority: explicit CLI flags  >  mode.default_output  >  stdout
-    #
-    # --popup flag    → always show popup
-    # --diff flag     → show diff (in popup if --popup, else stdout)
-    # --system        → use mode's default_output
-    # --clipboard     → write to clipboard
-    # otherwise       → stdout
-    # ------------------------------------------------------------------
-    if popup:
-        output = "popup"
-    elif system:
-        output = mode.default_output  # "replace" | "popup" | "clipboard"
-    elif clipboard:
-        output = "clipboard"
-    else:
-        output = "stdout"
 
     if output == "replace":
         from prosefmt.clipboard import (
@@ -580,6 +585,10 @@ def list_modes(ctx: click.Context, names: bool) -> None:
     """List all available rewrite modes."""
     config: Config = ctx.obj["config"]
 
+    if not config.modes:
+        click.echo("No modes configured.", err=True)
+        return
+
     if names:
         for name in config.modes:
             click.echo(name)
@@ -712,12 +721,8 @@ def config_show(ctx: click.Context) -> None:
 def check(ctx: click.Context) -> None:
     """Verify clipboard tools, picker, popup, and AI provider are ready."""
     from prosefmt.clipboard import check_clipboard_tools, install_hints
-    from prosefmt.picker import (
-        best_picker,
-        check_picker_tools,
-        install_hints_picker,
-    )
-    from prosefmt.popup import best_popup, check_popup_tools, install_hints_popup
+    from prosefmt.picker import best_picker, install_hints_picker
+    from prosefmt.popup import best_popup, install_hints_popup
     from prosefmt.providers import get_provider
 
     config: Config = ctx.obj["config"]
@@ -741,28 +746,18 @@ def check(ctx: click.Context) -> None:
     if picker:
         click.echo(f"✓ Picker: {picker}  (for 'prosefmt menu')")
     else:
-        status = check_picker_tools()
-        found = [t for t, v in status.items() if v]
-        if not found:
-            click.echo("⚠  No picker tool found  (needed for 'prosefmt menu')")
-            for line in install_hints_picker():
-                click.echo(line)
-        else:
-            click.echo(f"✓ Picker: {found[0]}")
+        click.echo("⚠  No picker tool found  (needed for 'prosefmt menu')")
+        for line in install_hints_picker():
+            click.echo(line)
 
     # --- Popup ---
     popup_tool = best_popup()
     if popup_tool:
         click.echo(f'✓ Popup: {popup_tool}  (for --popup / default_output = "popup")')
     else:
-        status = check_popup_tools()
-        found = [t for t, v in status.items() if v]
-        if not found:
-            click.echo('⚠  No popup tool found  (needed for --popup / default_output = "popup")')
-            for line in install_hints_popup():
-                click.echo(line)
-        else:
-            click.echo(f"✓ Popup: {found[0]}")
+        click.echo('⚠  No popup tool found  (needed for --popup / default_output = "popup")')
+        for line in install_hints_popup():
+            click.echo(line)
 
     # --- AI provider ---
     pname = config.default_provider

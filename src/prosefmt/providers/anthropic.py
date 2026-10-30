@@ -54,6 +54,8 @@ class AnthropicProvider:
             ) from exc
         except httpx.ConnectError as exc:
             raise ProviderError("Cannot connect to Anthropic API") from exc
+        except httpx.TimeoutException as exc:
+            raise ProviderError("Anthropic request timed out") from exc
 
         data = resp.json()
         try:

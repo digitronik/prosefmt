@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from prosefmt.clipboard import Platform
-from prosefmt.notify import notify
+from prosefmt.notify import _esc_applescript, _esc_xml, notify
 
 
 class TestNotify:
@@ -88,3 +88,44 @@ class TestNotify:
             notify("prosefmt", "test")
         captured = capsys.readouterr()
         assert "prosefmt" in captured.err
+
+
+class TestEscApplescript:
+    """Test AppleScript string escaping."""
+
+    def test_escapes_double_quotes(self):
+        assert _esc_applescript('say "hello"') == 'say \\"hello\\"'
+
+    def test_escapes_backslashes(self):
+        assert _esc_applescript("path\\to\\file") == "path\\\\to\\\\file"
+
+    def test_replaces_newlines(self):
+        assert _esc_applescript("line1\nline2") == "line1 line2"
+
+    def test_combined_escaping(self):
+        result = _esc_applescript('He said "hello\\n"')
+        assert '\\"' in result
+        assert "\\\\" in result
+
+
+class TestEscXml:
+    """Test XML string escaping for Windows toast notifications."""
+
+    def test_escapes_ampersand(self):
+        assert _esc_xml("A & B") == "A &amp; B"
+
+    def test_escapes_angle_brackets(self):
+        assert _esc_xml("<tag>") == "&lt;tag&gt;"
+
+    def test_escapes_quotes(self):
+        assert _esc_xml('say "hi"') == "say &quot;hi&quot;"
+
+    def test_replaces_newlines(self):
+        assert _esc_xml("line1\nline2") == "line1 line2"
+
+    def test_combined_escaping(self):
+        result = _esc_xml('x < 5 & y > 3 "ok"')
+        assert "&lt;" in result
+        assert "&amp;" in result
+        assert "&gt;" in result
+        assert "&quot;" in result

@@ -73,3 +73,11 @@ class TestOpenAICompatProvider:
         p = OpenAICompatProvider(url="http://localhost:8080/v1", model="local-model")
         result = p.complete("s", "u")
         assert result == "local"
+
+    def test_complete_timeout(self, httpx_mock):
+        import httpx
+
+        httpx_mock.add_exception(httpx.ReadTimeout("timed out"))
+        p = OpenAICompatProvider(api_key="sk-test")
+        with pytest.raises(ProviderError, match="timed out"):
+            p.complete("s", "u")

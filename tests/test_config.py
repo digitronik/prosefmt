@@ -158,6 +158,32 @@ prompt = "My custom fix prompt."
         assert config.modes["fix"].preserve_structure is True  # default preserved
 
 
+class TestCustomProviderFromToml:
+    def test_unknown_keys_are_ignored(self, tmp_path: Path):
+        """Extra/typo keys in a custom provider should not crash."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[providers.groq]
+url = "https://api.groq.com/openai/v1"
+model = "llama3-70b"
+typo_field = "should be ignored"
+""")
+        config = Config.load(cfg_file)
+        assert "groq" in config.providers
+        assert config.providers["groq"].url == "https://api.groq.com/openai/v1"
+        assert config.providers["groq"].model == "llama3-70b"
+
+    def test_custom_provider_minimal(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[providers.local]
+url = "http://localhost:1234/v1"
+""")
+        config = Config.load(cfg_file)
+        assert "local" in config.providers
+        assert config.providers["local"].url == "http://localhost:1234/v1"
+
+
 class TestInitConfig:
     def test_creates_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))

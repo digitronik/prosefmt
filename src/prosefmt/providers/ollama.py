@@ -37,6 +37,10 @@ class OllamaProvider:
             raise ProviderError(f"Ollama returned HTTP {exc.response.status_code}") from exc
         except httpx.ConnectError as exc:
             raise ProviderError("Cannot connect to Ollama — is it running? (ollama serve)") from exc
+        except httpx.TimeoutException as exc:
+            raise ProviderError(
+                "Ollama request timed out — the model may be too slow or still loading"
+            ) from exc
 
         data = resp.json()
         content = data.get("message", {}).get("content", "")

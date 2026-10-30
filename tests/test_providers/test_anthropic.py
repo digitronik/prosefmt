@@ -56,3 +56,11 @@ class TestAnthropicProvider:
 
     def test_health_check_without_key(self):
         assert AnthropicProvider(api_key="").check_health() is False
+
+    def test_complete_timeout(self, httpx_mock):
+        import httpx
+
+        httpx_mock.add_exception(httpx.ReadTimeout("timed out"))
+        p = AnthropicProvider(api_key="sk-ant-test")
+        with pytest.raises(ProviderError, match="timed out"):
+            p.complete("s", "u")

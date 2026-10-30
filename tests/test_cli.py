@@ -57,6 +57,18 @@ class TestListCommand:
         assert lines[0] == "fix"
         assert "summarize" in lines
 
+    def test_list_empty_modes(self, runner):
+        """list command should not crash when config has no modes."""
+        with patch("prosefmt.config.Config.load") as mock_load:
+            from prosefmt.config import Config
+
+            cfg = Config()
+            cfg.modes = {}
+            mock_load.return_value = cfg
+            result = runner.invoke(cli, ["list"])
+            assert result.exit_code == 0
+            assert "no modes" in result.output.lower()
+
 
 class TestConfigCommand:
     def test_config_show(self, runner):
@@ -338,6 +350,31 @@ class TestDiffOutput:
             mock_gp.return_value.complete.return_value = "Fixed text."
             result = runner.invoke(cli, ["--diff"], input="bad text\n")
             assert result.exit_code == 0
+
+    def test_diff_with_system_shows_diff_on_stdout(self, runner):
+        """--diff + --system should show diff on stdout, NOT silently replace in-place."""
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.clipboard.clipboard_read", return_value="bad grammer"),
+        ):
+            mock_gp.return_value.complete.return_value = "bad grammar"
+            result = runner.invoke(cli, ["--diff", "-s"])
+            assert result.exit_code == 0
+            # Diff should be visible in stdout (not silently pasted)
+            assert "---" in result.output or "(no changes)" in result.output
+
+    def test_diff_with_popup_disables_color(self, runner):
+        """--diff + --popup should NOT include ANSI color codes in popup text."""
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["--diff", "--popup", "bad text"])
+            assert result.exit_code == 0
+            popup_text = mock_popup.call_args[0][0]
+            # ANSI escape codes must NOT appear in popup text
+            assert "\033[" not in popup_text
 
 
 class TestPerModeProviderOverride:
