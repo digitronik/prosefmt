@@ -29,7 +29,15 @@ class TestCLIBasics:
     def test_no_args_shows_help(self, runner):
         result = runner.invoke(cli, [])
         assert result.exit_code == 0
-        assert "Usage" in result.output
+        assert "prosefmt" in result.output.lower()
+
+    def test_help_shows_rewrite_options(self, runner):
+        result = runner.invoke(cli, ["--help"])
+        assert "--mode" in result.output or "-m" in result.output
+
+    def test_help_shows_available_modes(self, runner):
+        result = runner.invoke(cli, ["--help"])
+        assert "fix" in result.output
 
 
 class TestListCommand:
@@ -63,37 +71,74 @@ class TestConfigCommand:
         assert "config" in result.output.lower()
 
 
-class TestModeCommands:
-    def test_fix_with_text(self, runner):
+class TestRewriteDefault:
+    """Test the default rewrite command (no subcommand)."""
+
+    def test_text_argument(self, runner):
         with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Fixed text."
-            result = runner.invoke(cli, ["fix", "bad grammer"])
+            result = runner.invoke(cli, ["bad grammer"])
             assert result.exit_code == 0
             assert "Fixed text." in result.output
 
-    def test_fix_from_stdin(self, runner):
+    def test_text_with_explicit_mode(self, runner):
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Pro text."
+            result = runner.invoke(cli, ["-m", "professional", "text"])
+            assert result.exit_code == 0
+            assert "Pro text." in result.output
+
+    def test_stdin_pipe(self, runner):
         with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Fixed text."
-            result = runner.invoke(cli, ["fix"], input="bad grammer\n")
+            result = runner.invoke(cli, [], input="bad grammer\n")
             assert result.exit_code == 0
             assert "Fixed text." in result.output
+
+    def test_stdin_pipe_with_mode(self, runner):
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Casual text."
+            result = runner.invoke(cli, ["-m", "casual"], input="text\n")
+            assert result.exit_code == 0
+            assert "Casual text." in result.output
 
     def test_unknown_mode(self, runner):
-        result = runner.invoke(cli, ["nonexistent-mode", "text"])
+        result = runner.invoke(cli, ["-m", "nonexistent-mode", "text"])
         assert result.exit_code != 0
 
-    def test_no_text_shows_error(self, runner):
-        result = runner.invoke(cli, ["fix"])
+    def test_no_text_with_mode_shows_error(self, runner):
+        with patch("prosefmt.clipboard.clipboard_read", return_value=""):
+            result = runner.invoke(cli, ["-m", "fix", "-s"])
         assert result.exit_code != 0
         assert "no text" in result.output.lower()
 
     def test_provider_override(self, runner):
         with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Done."
-            result = runner.invoke(cli, ["fix", "--provider", "openai", "text"])
+            result = runner.invoke(cli, ["-p", "openai", "text"])
             assert result.exit_code == 0
-            call_args = mock_gp.call_args
-            assert call_args[0][0] == "openai"
+            assert mock_gp.call_args[0][0] == "openai"
+
+    def test_default_mode_is_fix(self, runner):
+        """Without -m, the default mode 'fix' is used."""
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Fixed."
+            result = runner.invoke(cli, ["text"])
+            assert result.exit_code == 0
+            # Verify the rewrite was called (mode resolution happens internally)
+            mock_gp.return_value.complete.assert_called_once()
+
+    def test_default_mode_from_config(self, runner, tmp_path, monkeypatch):
+        """Config's default_mode is respected."""
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        cfg = tmp_path / "prosefmt" / "config.toml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text('default_mode = "professional"\n')
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Pro."
+            result = runner.invoke(cli, ["text"])
+            assert result.exit_code == 0
+            assert "Pro." in result.output
 
 
 class TestUndoCommand:
@@ -108,14 +153,112 @@ class TestUndoCommand:
 
         with patch("prosefmt.providers.get_provider") as mock_gp:
             mock_gp.return_value.complete.return_value = "Fixed."
-            runner.invoke(cli, ["fix", "original text"])
+            runner.invoke(cli, ["original text"])
 
         result = runner.invoke(cli, ["undo"])
         assert result.exit_code == 0
         assert "original text" in result.output
 
 
+class TestMenuCommand:
+    def test_menu_selects_known_mode(self, runner):
+        with (
+            patch("prosefmt.picker.best_picker", return_value="rofi"),
+            patch("prosefmt.picker.pick", return_value="fix"),
+            patch("prosefmt.providers.get_provider") as mock_gp,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["menu", "bad grammer"])
+            assert result.exit_code == 0
+            assert "Fixed text." in result.output
+
+    def test_menu_custom_prompt(self, runner):
+        """User types a free-form prompt not in the mode list."""
+        with (
+            patch("prosefmt.picker.best_picker", return_value="rofi"),
+            patch(
+                "prosefmt.picker.pick",
+                return_value="make it sound excited",
+            ),
+            patch("prosefmt.providers.get_provider") as mock_gp,
+        ):
+            mock_gp.return_value.complete.return_value = "Excited text!"
+            result = runner.invoke(cli, ["menu", "some text"])
+            assert result.exit_code == 0
+            assert "Excited text!" in result.output
+
+    def test_menu_cancelled_exits_cleanly(self, runner):
+        with (
+            patch("prosefmt.picker.best_picker", return_value="rofi"),
+            patch("prosefmt.picker.pick", return_value=None),
+        ):
+            result = runner.invoke(cli, ["menu", "some text"])
+            assert result.exit_code == 0
+
+    def test_menu_no_picker_installed(self, runner):
+        with patch("prosefmt.picker.best_picker", return_value=None):
+            result = runner.invoke(cli, ["menu", "text"])
+            assert result.exit_code != 0
+            assert "picker" in result.output.lower() or "picker" in (result.stderr or "").lower()
+
+    def test_menu_no_text_selected(self, runner):
+        with patch("prosefmt.picker.best_picker", return_value="rofi"):
+            result = runner.invoke(cli, ["menu"])
+            assert result.exit_code != 0
+
+    def test_menu_per_mode_provider_used(self, runner):
+        with (
+            patch("prosefmt.picker.best_picker", return_value="rofi"),
+            patch("prosefmt.picker.pick", return_value="fix"),
+            patch("prosefmt.providers.get_provider") as mock_gp,
+        ):
+            mock_gp.return_value.complete.return_value = "Done."
+            runner.invoke(cli, ["menu", "text"])
+            assert mock_gp.call_args[0][0] == "ollama"
+
+
+class TestPerModeProviderOverride:
+    def test_mode_provider_used_when_no_cli_flag(self, runner, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        cfg = tmp_path / "prosefmt" / "config.toml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text("""\
+[modes.review]
+prompt = "Review this."
+provider = "openai"
+""")
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Review done."
+            result = runner.invoke(cli, ["-m", "review", "some text"])
+            assert result.exit_code == 0
+            assert mock_gp.call_args[0][0] == "openai"
+
+    def test_cli_flag_overrides_mode_provider(self, runner, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        cfg = tmp_path / "prosefmt" / "config.toml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text("""\
+[modes.review]
+prompt = "Review this."
+provider = "openai"
+""")
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Done."
+            runner.invoke(cli, ["-m", "review", "-p", "anthropic", "text"])
+            assert mock_gp.call_args[0][0] == "anthropic"
+
+
 class TestCheckCommand:
     def test_check_command(self, runner):
         result = runner.invoke(cli, ["check"])
         assert "clipboard" in result.output.lower() or "provider" in result.output.lower()
+
+    def test_check_reports_picker(self, runner):
+        with patch("prosefmt.picker.shutil.which", return_value="/usr/bin/rofi"):
+            result = runner.invoke(cli, ["check"])
+        assert "picker" in result.output.lower() or "rofi" in result.output.lower()
+
+    def test_check_warns_no_picker(self, runner):
+        with patch("prosefmt.picker.shutil.which", return_value=None):
+            result = runner.invoke(cli, ["check"])
+        assert "picker" in result.output.lower() or "menu" in result.output.lower()

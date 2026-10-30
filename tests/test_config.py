@@ -10,6 +10,10 @@ from prosefmt.config import Config, init_config
 
 
 class TestConfigDefaults:
+    def test_default_mode_is_fix(self):
+        config = Config.load()
+        assert config.default_mode == "fix"
+
     def test_default_provider_is_ollama(self):
         config = Config.load()
         assert config.default_provider == "ollama"
@@ -84,6 +88,18 @@ label = "Custom fixed"
         assert "fix" in config.modes
 
 
+class TestDefaultMode:
+    def test_default_mode_from_file(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('default_mode = "professional"\n')
+        config = Config.load(cfg_file)
+        assert config.default_mode == "professional"
+
+    def test_default_mode_fallback(self, tmp_path: Path):
+        config = Config.load(tmp_path / "nope.toml")
+        assert config.default_mode == "fix"
+
+
 class TestConfigEnv:
     def test_openai_key_from_env(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test-123")
@@ -97,17 +113,62 @@ class TestConfigEnv:
         assert config.providers["openai"].api_key == "specific"
 
 
+class TestModeProviderOverride:
+    def test_per_mode_provider_parsed(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[modes.review]
+prompt = "Review this."
+label = "Reviewed"
+provider = "openai"
+model = "gpt-4o"
+""")
+        config = Config.load(cfg_file)
+        assert config.modes["review"].provider == "openai"
+        assert config.modes["review"].model == "gpt-4o"
+
+    def test_per_mode_default_output_parsed(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[modes.summarize]
+prompt = "Summarize."
+default_output = "popup"
+""")
+        config = Config.load(cfg_file)
+        assert config.modes["summarize"].default_output == "popup"
+
+    def test_mode_without_override_has_none(self, tmp_path: Path):
+        config = Config.load(tmp_path / "nope.toml")
+        assert config.modes["fix"].provider is None
+        assert config.modes["fix"].model is None
+
+    def test_default_output_defaults_to_replace(self, tmp_path: Path):
+        config = Config.load(tmp_path / "nope.toml")
+        assert config.modes["fix"].default_output == "replace"
+
+    def test_overriding_builtin_preserves_other_fields(self, tmp_path: Path):
+        """Overriding just the prompt should not reset preserve_structure."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[modes.fix]
+prompt = "My custom fix prompt."
+""")
+        config = Config.load(cfg_file)
+        assert config.modes["fix"].prompt == "My custom fix prompt."
+        assert config.modes["fix"].preserve_structure is True  # default preserved
+
+
 class TestInitConfig:
     def test_creates_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         path = init_config()
         assert path.exists()
-        assert "prosefmt" in path.read_text().lower()
+        assert "prosefmt" in path.read_text(encoding="utf-8").lower()
 
     def test_does_not_overwrite(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         path = init_config()
-        path.read_text()
-        path.write_text("custom content")
+        path.read_text(encoding="utf-8")
+        path.write_text("custom content", encoding="utf-8")
         init_config()
-        assert path.read_text() == "custom content"
+        assert path.read_text(encoding="utf-8") == "custom content"
