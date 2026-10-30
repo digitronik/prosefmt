@@ -200,7 +200,7 @@ default_provider = "ollama"
 # System prompt — prepended to every mode's instruction.
 # Keep it SHORT when using local models (qwen2.5, phi3, gemma).
 system_prompt = """You are a text editor. Output ONLY the rewritten text.
-No preamble, no explanations, no \\'Here is…\\'.
+No preamble, no explanations, no 'Here is…'.
 Keep technical terms, code, URLs, and markdown structure exactly as written."""
 
 # ── Providers ─────────────────────────────────────────────────────────────────

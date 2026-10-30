@@ -16,13 +16,15 @@ rephrased: all without leaving the app you are in.
 It also works as a standard CLI tool that composes with pipes and scripts.
 
 ```
-$ prosefmt fix "i can haz good grammer?"
+$ prosefmt "i can haz good grammer?"
 I can have good grammar?
 
-$ echo "this sentense has a typo" | prosefmt fix
+$ echo "this sentense has a typo" | prosefmt
 This sentence has a typo.
 
-$ prosefmt professional --clipboard    # reads clipboard → rewrites → writes back
+$ prosefmt -m professional --clipboard    # reads clipboard → rewrites → writes back
+
+$ prosefmt menu -s -n                     # highlight text → picker → rewrite → paste back
 ```
 
 → **[Jump to hotkey setup ↓](#system-wide-hotkeys)**
@@ -37,10 +39,12 @@ $ prosefmt professional --clipboard    # reads clipboard → rewrites → writes
   - [Step 1 — Install clipboard tools](#step-1--install-clipboard-tools)
   - [Step 2 — Choose an AI provider](#step-2--choose-an-ai-provider)
   - [Step 3 — Create your config](#step-3--create-your-config)
-  - [Step 4 — Verify everything works](#step-4--verify-everything-works)
-  - [Step 5 — Try it out](#step-5--try-it-out)
+  - [Step 4 — Install a picker tool](#step-4--install-a-picker-tool-for-prosefmt-menu)
+  - [Step 5 — Verify everything works](#step-5--verify-everything-works)
+  - [Step 6 — Try it out](#step-6--try-it-out)
 - [System-Wide Hotkeys](#system-wide-hotkeys)
 - [Built-in Modes](#built-in-modes)
+- [Mode Picker](#mode-picker)
 - [Custom Modes](#custom-modes)
 - [Configuration Reference](#configuration-reference)
 - [Commands](#commands)
@@ -61,8 +65,10 @@ scripts, and runs on every OS.
 | Size | ~2 Python deps | 100–200 MB runtime |
 | Composability | Pipes, scripts, automation | GUI click-through only |
 | Providers | Ollama, OpenAI, Anthropic, any OpenAI-compat | Varies |
-| Custom modes | One line in a config file | Fork the source |
-| Hotkey integration | Any window manager or OS shortcut | Their own UI |
+| Custom modes | One TOML block; all prompts user-editable | Fork the source |
+| Mode picker | Built-in (`prosefmt menu`) — no shell script | Their own UI |
+| Hotkey integration | Any window manager, two lines of config | Their own UI |
+| Per-mode AI model | Yes — route tasks to different models | No |
 
 ---
 
@@ -221,7 +227,29 @@ model = "gpt-4o-mini"    # API key comes from OPENAI_API_KEY env var
 
 ---
 
-### Step 4 — Verify everything works
+### Step 4 — Install a picker tool (for `prosefmt menu`)
+
+The `prosefmt menu` command opens a graphical mode picker — no shell scripting needed. Install any
+one of these:
+
+```bash
+# Fedora
+sudo dnf install rofi           # X11 / Wayland
+
+# Debian / Ubuntu
+sudo apt install rofi
+
+# Arch / Manjaro
+sudo pacman -S rofi
+
+# Or any of: wofi, fuzzel, dmenu, zenity, fzf — prosefmt auto-detects the best one
+```
+
+> Skip this step if you only plan to use `prosefmt -s -n` (direct hotkey, no picker).
+
+---
+
+### Step 5 — Verify everything works
 
 ```bash
 prosefmt check
@@ -231,6 +259,7 @@ Expected output:
 
 ```
 ✓ Clipboard tools installed
+✓ Picker tool:  rofi
 ✓ Provider 'ollama' is reachable  (model: qwen2.5:1.5b)
 ```
 
@@ -238,23 +267,26 @@ If anything is wrong, `prosefmt check` prints the exact command to fix it.
 
 ---
 
-### Step 5 — Try it out
+### Step 6 — Try it out
 
 ```bash
-# Pass text directly
-prosefmt fix "me and him went to the store yesterday"
+# Pass text directly (default mode: fix)
+prosefmt "me and him went to the store yesterday"
+
+# Explicit mode
+prosefmt -m professional "please review the attached document"
 
 # Pipe from stdin
-echo "this sentense has a typo" | prosefmt fix
+echo "this sentense has a typo" | prosefmt
 
 # Read from clipboard and print the result
-prosefmt fix --clipboard
-
-# Read from clipboard, rewrite, and write the result back to clipboard
-prosefmt professional --clipboard
+prosefmt --clipboard
 
 # System-wide: read selected text from any app, rewrite, paste back in-place
-prosefmt fix --system
+prosefmt --system
+
+# Open the mode picker, then rewrite selected text with the chosen mode
+prosefmt menu -s -n
 ```
 
 ---
@@ -269,14 +301,33 @@ Two bindings are recommended:
 
 | Hotkey | Action |
 |:---|:---|
-| `Mod+G` | Fix grammar immediately — no prompt |
-| `Mod+Shift+G` | Open a mode picker — choose fix / professional / casual / rephrase / … |
+| `Mod+G` | Fix grammar immediately (default mode, no picker) |
+| `Mod+Shift+G` | Open the built-in mode picker — choose any mode interactively |
+
+The mode picker (`prosefmt menu`) is built into the CLI — **no shell script required**. It
+auto-detects the best available picker tool (rofi → wofi → fuzzel → dmenu → zenity → fzf) and
+launches it. You can also type a free-form instruction directly into the picker to use it as a
+one-shot custom prompt.
+
+> **Clipboard safety:** `--system` reads your highlighted text via the *primary* selection and
+> pastes the result back via a temporary clipboard write. Your previous Ctrl+C content is saved
+> before the paste and automatically restored afterwards — so your clipboard is never destroyed.
 
 ---
 
 ### Linux — i3wm / Sway
 
-Install [rofi](https://github.com/davatorium/rofi) if you do not have it already:
+Add to `~/.config/i3/config` (or `~/.config/sway/config`):
+
+```
+bindsym $mod+g       exec --no-startup-id prosefmt -s -n
+bindsym $mod+Shift+g exec --no-startup-id prosefmt menu -s -n
+```
+
+Reload i3 with `Mod+Shift+C`.
+
+That is all. prosefmt detects whichever picker you have installed — rofi, wofi, fuzzel, dmenu,
+zenity, or fzf. Install any one:
 
 ```bash
 sudo dnf install rofi   # Fedora
@@ -284,79 +335,47 @@ sudo apt install rofi   # Debian / Ubuntu
 sudo pacman -S rofi     # Arch
 ```
 
-Create the mode picker script at `~/.config/prosefmt/prosefmt-menu.sh`:
-
-```bash
-#!/bin/bash
-set -euo pipefail
-PROMPT=$'\uf044'" prosefmt"
-choice=$(prosefmt list --names | rofi -dmenu -i -p "$PROMPT" -theme-str 'window {width: 28%;}')
-[[ -z "$choice" ]] && exit 0
-exec prosefmt "$choice" --system --notify
-```
-
-```bash
-chmod +x ~/.config/prosefmt/prosefmt-menu.sh
-```
-
-Add to `~/.config/i3/config` (or `~/.config/sway/config`):
-
-```
-bindsym $mod+g       exec --no-startup-id prosefmt fix --system --notify
-bindsym $mod+Shift+g exec --no-startup-id ~/.config/prosefmt/prosefmt-menu.sh
-```
-
-Reload i3 with `Mod+Shift+C`.
+Run `prosefmt check` to confirm your picker is detected.
 
 ---
 
 ### Linux — Hyprland
 
-Install **wofi** (Wayland-native picker) or **rofi** (also supports Wayland on modern builds):
+Add to `~/.config/hypr/hyprland.conf`:
+
+```
+bind = $mainMod,       G, exec, prosefmt -s -n
+bind = $mainMod SHIFT, G, exec, prosefmt menu -s -n
+```
+
+Install a Wayland-native picker if you do not have one:
 
 ```bash
-sudo dnf install wofi   # Fedora
+sudo dnf install wofi   # Fedora — Wayland-native
 sudo apt install wofi   # Debian / Ubuntu
 sudo pacman -S wofi     # Arch
 ```
 
-Create the mode picker script at `~/.config/prosefmt/prosefmt-menu.sh`:
-
-```bash
-#!/bin/bash
-set -euo pipefail
-# Use wofi if available, otherwise fall back to rofi
-if command -v wofi &>/dev/null; then
-    choice=$(prosefmt list --names | wofi --dmenu --prompt "prosefmt")
-else
-    choice=$(prosefmt list --names | rofi -dmenu -i -p "prosefmt")
-fi
-[[ -z "$choice" ]] && exit 0
-exec prosefmt "$choice" --system --notify
-```
-
-```bash
-chmod +x ~/.config/prosefmt/prosefmt-menu.sh
-```
-
-Add to `~/.config/hypr/hyprland.conf`:
-
-```
-bind = $mainMod,       G, exec, prosefmt fix --system --notify
-bind = $mainMod SHIFT, G, exec, ~/.config/prosefmt/prosefmt-menu.sh
-```
+prosefmt also accepts rofi (Wayland mode), fuzzel, or fzf.
 
 ---
 
 ### Linux — GNOME / KDE (any desktop)
 
-rofi works on GNOME and KDE too — install it and use the same script from the i3wm section above.
-Then add the shortcuts in **Settings → Keyboard → Custom Shortcuts**:
+Add custom shortcuts in **Settings → Keyboard → Custom Shortcuts**:
 
 | Name | Command | Shortcut |
 |:---|:---|:---|
-| prosefmt fix | `prosefmt fix --system --notify` | `Super+G` |
-| prosefmt mode picker | `~/.config/prosefmt/prosefmt-menu.sh` | `Super+Shift+G` |
+| prosefmt (default fix) | `prosefmt -s -n` | `Super+G` |
+| prosefmt mode picker | `prosefmt menu -s -n` | `Super+Shift+G` |
+
+Install a picker tool (rofi works on GNOME and KDE):
+
+```bash
+sudo dnf install rofi   # Fedora
+sudo apt install rofi   # Debian / Ubuntu
+sudo pacman -S rofi     # Arch
+```
 
 ---
 
@@ -368,7 +387,7 @@ chooser for the mode picker. Add to `~/.hammerspoon/init.lua`:
 ```lua
 -- Grammar fix
 hs.hotkey.bind({"cmd"}, "g", function()
-  hs.task.new("/usr/local/bin/prosefmt", nil, {"fix", "--system", "--notify"}):start()
+  hs.task.new("/usr/local/bin/prosefmt", nil, {"--system", "--notify"}):start()
 end)
 
 -- Mode picker — opens Hammerspoon's native chooser
@@ -381,7 +400,7 @@ hs.hotkey.bind({"cmd", "shift"}, "g", function()
     local chooser = hs.chooser.new(function(choice)
       if choice then
         hs.task.new("/usr/local/bin/prosefmt", nil,
-          {choice.text, "--system", "--notify"}):start()
+          {"-m", choice.text, "--system", "--notify"}):start()
       end
     end)
     chooser:choices(choices)
@@ -392,6 +411,9 @@ end)
 
 Reload the Hammerspoon config from the menu bar icon.
 
+> **Tip:** If you install `fzf` via Homebrew (`brew install fzf`), you can also use
+> `prosefmt menu -s -n` directly — it opens fzf in a terminal window.
+
 ---
 
 ### macOS — Automator / Shortcuts app
@@ -399,7 +421,7 @@ Reload the Hammerspoon config from the menu bar icon.
 For a fix-only binding without Hammerspoon, create a **Quick Action** in Automator that runs:
 
 ```bash
-/usr/local/bin/prosefmt fix --system --notify
+/usr/local/bin/prosefmt --system --notify
 ```
 
 Assign it a keyboard shortcut in **System Settings → Keyboard → Keyboard Shortcuts → Services**.
@@ -414,14 +436,14 @@ Create `prosefmt-menu.ps1` anywhere on your system (for example `%USERPROFILE%\p
 # prosefmt-menu.ps1
 $modes = (& prosefmt list --names) -split "`n" | Where-Object { $_ }
 $mode  = $modes | Out-GridView -Title "prosefmt — choose a mode" -PassThru
-if ($mode) { & prosefmt $mode --system --notify }
+if ($mode) { & prosefmt -m $mode --system --notify }
 ```
 
 Add to your AutoHotkey v2 script:
 
 ```ahk
 ; prosefmt.ahk
-#g::  Run "prosefmt fix --system --notify",, "Hide"
+#g::  Run "prosefmt --system --notify",, "Hide"
 #+g:: Run 'powershell -WindowStyle Hidden -File "%USERPROFILE%\prosefmt-menu.ps1"',, "Hide"
 ```
 
@@ -444,16 +466,68 @@ Run `prosefmt list` to see all modes including any custom ones you have added.
 
 ---
 
+## Mode Picker
+
+`prosefmt menu` opens an interactive mode picker — no shell scripting required.
+
+```bash
+# Highlight text → picker → chosen mode rewrites and pastes back
+prosefmt menu -s -n
+
+# Or pick a mode and let it read from clipboard
+prosefmt menu -c
+```
+
+prosefmt auto-detects the best installed picker in this order: **rofi → wofi → fuzzel → dmenu →
+zenity → fzf**. Install any one of them (see [System-Wide Hotkeys](#system-wide-hotkeys) for
+platform-specific install commands).
+
+### Free-form prompts
+
+You can type anything directly into the picker. If what you type is not a mode name, prosefmt
+treats it as a one-shot custom instruction:
+
+```
+  fix
+  professional
+  casual
+  translate to French        ← typed freely — runs as an ad-hoc prompt
+  make this sound angrier    ← also works
+```
+
+No config file changes needed for one-off instructions.
+
+### Check picker status
+
+```bash
+prosefmt check
+```
+
+```
+✓ Clipboard tools installed
+✓ Picker tool:  rofi
+✓ Provider 'ollama' is reachable  (model: qwen2.5:1.5b)
+```
+
+If no picker is installed, `prosefmt check` suggests the install command for your distro.
+
+---
+
 ## Custom Modes
 
-Add any number of custom modes to your config file:
+Add any number of custom modes to your config file. All prompts live in `config.toml` — nothing
+is hard-coded in prosefmt itself. You can also edit the built-in mode prompts.
 
 ```toml
 # ~/.config/prosefmt/config.toml
 
 [modes.translate-spanish]
 prompt = "Translate to Spanish. Keep technical terms in English."
-label  = "Translated to Spanish"
+label  = "🇪🇸 Spanish"
+
+[modes.translate-czech]
+prompt = "Translate to Czech. Preserve meaning and tone."
+label  = "🇨🇿 Czech"
 
 [modes.code-comments]
 prompt             = "Add clear, concise comments to this code. Do not change the code itself."
@@ -472,11 +546,98 @@ label  = "Simplified"
 Use them exactly like built-in modes:
 
 ```bash
-prosefmt translate-spanish "Good morning, how are you?"
-prosefmt slack "Please review the pull request I opened for the authentication refactor."
+prosefmt -m translate-spanish "Good morning, how are you?"
+prosefmt -m slack "Please review the pull request I opened for the authentication refactor."
 ```
 
-Custom modes appear automatically in the mode picker — no changes to your hotkey scripts needed.
+Custom modes appear automatically in `prosefmt menu` — no changes to your hotkey config needed.
+
+### Making a custom mode the default
+
+Set `default_mode` in your config so pressing `Mod+G` (the bare hotkey) uses a different mode:
+
+```toml
+# Bare hotkey fixes grammar for most work, but if you're a translator:
+default_mode = "translate-czech"
+```
+
+Then `prosefmt -s -n` (your `Mod+G` binding) translates instead of fixing grammar.
+
+### Real-world example: Czech ↔ English translation workflow
+
+You receive a message in Czech. You want to read it in English, write your reply in English, then
+send it back as Czech — all without switching apps.
+
+**Config:**
+
+```toml
+[modes.translate-english]
+prompt         = "Translate to English. Keep technical terms as-is."
+label          = "→ English"
+default_output = "popup"      # show translation — don't replace the Czech text
+
+[modes.translate-czech]
+prompt         = "Translate to Czech. Keep technical terms, code, and URLs in English."
+label          = "→ Czech"
+default_output = "replace"    # replace your English draft with Czech in-place
+```
+
+**Workflow:**
+
+```
+1. Highlight the Czech message → Mod+Shift+G → translate-english
+   → popup shows the English translation (Czech text untouched)
+
+2. Read the popup, type your English reply in the chat/email box
+
+3. Highlight your English reply → Mod+Shift+G → translate-czech
+   → English replaced with Czech in-place → hit send
+```
+
+The same pattern works for Hindi, French, Spanish, Japanese — one mode per language direction.
+
+---
+
+### Per-mode provider and model
+
+Route specific modes to different AI providers or models — for example, use a fast local model
+for quick fixes and a cloud model for deep rewrites:
+
+```toml
+[modes.fix]
+prompt   = "Fix grammar, spelling, and punctuation. Output ONLY the corrected text."
+provider = "ollama"
+model    = "qwen2.5:1.5b"   # fast, local, CPU-friendly
+
+[modes.review]
+prompt   = "Review this text for clarity, tone, and impact. Suggest specific improvements."
+provider = "anthropic"
+model    = "claude-opus-4-5"  # heavy task → cloud model
+```
+
+CLI flags `--provider` and `--model` always override the mode config for that run.
+
+### Controlling output
+
+Every mode has a `default_output` field that decides what happens to the result:
+
+| Value | Behaviour |
+|:---|:---|
+| `"replace"` | Paste result back in-place, replacing the original text (default) |
+| `"clipboard"` | Write result to clipboard only (don't paste) |
+| `"popup"` | Show result in a popup window — original text is untouched *(Phase 2)* |
+
+```toml
+[modes.translate-czech]
+prompt         = "Translate to Czech. Keep technical terms in English."
+default_output = "replace"    # paste the Czech translation back in-place
+
+[modes.translate-english]
+prompt         = "Translate to English."
+default_output = "popup"      # show translation in popup — don't replace original
+```
+
+The `popup` display module is coming in Phase 2. Until then, popup modes fall back to stdout.
 
 ---
 
@@ -497,12 +658,16 @@ Run `prosefmt config init` to create it, `prosefmt config show` to see active va
 ```toml
 # ~/.config/prosefmt/config.toml
 
-# Which provider to use by default
+# Default mode — used when running `prosefmt "text"` without -m.
+# Change to any mode name you define (e.g. "professional", "translate-czech").
+default_mode = "fix"
+
+# Default AI provider (options: ollama, openai, anthropic, openai-compat)
 default_provider = "ollama"
 
 # System prompt applied to every rewrite mode.
 # Uncomment and edit to change the AI's base behaviour.
-# system_prompt = "You are a text editor. Output ONLY the rewritten text — no preamble."
+# system_prompt = "You are a text editor. Output ONLY the rewritten text — no preamble, no quotes."
 
 # ── Providers ────────────────────────────────────────────────────────────────
 
@@ -523,7 +688,38 @@ model = "claude-haiku-4-5-20251001"
 # url   = "https://api.groq.com/openai/v1"
 # model = "llama-3.3-70b-versatile"
 # API key: set PROSEFMT_COMPAT_API_KEY in your environment
+
+# ── Modes ─────────────────────────────────────────────────────────────────────
+# Every built-in mode can be edited here. `prosefmt config init` writes all of
+# them out so you can see and change every default prompt.
+
+# [modes.fix]
+# prompt             = "Fix grammar, spelling, and punctuation only. Output ONLY the corrected text."
+# label              = "Fix Grammar"
+# preserve_structure = true     # keep bullet lists, numbered lists intact
+# provider           = "ollama" # optional: override default_provider for this mode
+# model              = "qwen2.5:1.5b"  # optional: override provider's default model
+# default_output     = "replace"       # "replace" | "popup" | "clipboard"
 ```
+
+### Top-level keys
+
+| Key | Type | Default | Description |
+|:---|:---|:---|:---|
+| `default_mode` | string | `"fix"` | Mode used when `-m` is not specified |
+| `default_provider` | string | `"ollama"` | Provider used when mode has no `provider` override |
+| `system_prompt` | string | built-in | System instruction prepended to every mode |
+
+### Mode fields
+
+| Field | Type | Default | Description |
+|:---|:---|:---|:---|
+| `prompt` | string | required | The instruction sent to the AI |
+| `label` | string | mode name | Display name shown in the picker |
+| `preserve_structure` | bool | `true` | Re-attach bullet / numbered list markers after rewrite |
+| `provider` | string | `default_provider` | Provider to use for this mode only |
+| `model` | string | provider default | Model to use for this mode only |
+| `default_output` | string | `"replace"` | What to do with the result: `replace`, `popup`, `clipboard` |
 
 ### API keys — environment variables
 
@@ -543,17 +739,23 @@ load automatically in every session.
 ## Commands
 
 ```
-prosefmt <mode> [TEXT]         Rewrite TEXT (or stdin if omitted)
-prosefmt <mode> --clipboard    Read from clipboard, print result (also writes back)
-prosefmt <mode> --system       Read selected text, rewrite, paste back in-place
-prosefmt <mode> --provider P   Override the AI provider for this run
-prosefmt <mode> --model M      Override the model for this run
-prosefmt <mode> --notify       Show a desktop notification when done
+prosefmt [TEXT]                Rewrite TEXT with default mode (or stdin if omitted)
+prosefmt -m MODE [TEXT]        Rewrite with a specific mode
+prosefmt -s / --system         Read highlighted text, paste result back in-place
+prosefmt -c / --clipboard      Read from and write to clipboard
+prosefmt -n / --notify         Show a desktop notification when done
+prosefmt -p / --provider P     Override the AI provider for this run
+prosefmt --model M             Override the model for this run
+
+prosefmt menu                  Open the built-in mode picker, then rewrite
+prosefmt menu -s -n            Highlight text → picker → rewrite → paste back
+prosefmt menu -c               Read clipboard → picker → rewrite → write back
+prosefmt menu -p P --model M   Override provider/model for this picker session
 
 prosefmt list                  List all available modes (human-readable)
-prosefmt list --names          Mode names only — used by hotkey picker scripts
+prosefmt list --names          Mode names only
 prosefmt undo                  Restore the original text from the last rewrite
-prosefmt check                 Check clipboard tools and provider connectivity
+prosefmt check                 Check clipboard tools, picker, and provider connectivity
 prosefmt config init           Create ~/.config/prosefmt/config.toml
 prosefmt config show           Show the active configuration
 
