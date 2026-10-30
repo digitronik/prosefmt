@@ -53,12 +53,17 @@ class ModeConfig:
     prompt: str
     label: str = ""
     preserve_structure: bool = True
+    # Per-mode overrides — leave None to use the global defaults
+    provider: str | None = None  # override config.default_provider
+    model: str | None = None  # override provider's default model
+    default_output: str = "replace"  # "replace" | "popup" | "clipboard"
 
 
 @dataclass
 class Config:
     """Top-level configuration."""
 
+    default_mode: str = "fix"
     default_provider: str = "ollama"
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
@@ -110,6 +115,8 @@ class Config:
 
     def _apply_toml(self, raw: dict[str, Any]) -> None:
         """Overlay TOML values onto the config."""
+        if "default_mode" in raw:
+            self.default_mode = raw["default_mode"]
         if "default_provider" in raw:
             self.default_provider = raw["default_provider"]
         if "system_prompt" in raw:
@@ -128,12 +135,22 @@ class Config:
                 self.providers[pname] = ProviderConfig(name=pname, **pdata)
 
         for mname, mdata in raw.get("modes", {}).items():
-            preserve = mdata.get("preserve_structure", mname not in ("summarize", "email"))
+            # preserve_structure default: False for summarize/email, True otherwise
+            existing = self.modes.get(mname)
+            _no_preserve = ("summarize", "email")
+            if existing:
+                default_preserve = existing.preserve_structure
+            else:
+                default_preserve = mname not in _no_preserve
+            default_label = existing.label if existing else mname.replace("-", " ").title()
             self.modes[mname] = ModeConfig(
                 name=mname,
-                prompt=mdata.get("prompt", ""),
-                label=mdata.get("label", mname.replace("-", " ").title()),
-                preserve_structure=preserve,
+                prompt=mdata.get("prompt", existing.prompt if existing else ""),
+                label=mdata.get("label", default_label),
+                preserve_structure=mdata.get("preserve_structure", default_preserve),
+                provider=mdata.get("provider") or None,
+                model=mdata.get("model") or None,
+                default_output=mdata.get("default_output", "replace"),
             )
 
     def _apply_env(self) -> None:
@@ -163,41 +180,147 @@ def init_config() -> Path:
     return path
 
 
-_DEFAULT_CONFIG_CONTENT = """\
-# prosefmt configuration — https://github.com/digitronik/prosefmt
+_DEFAULT_CONFIG_CONTENT = '''\
+# prosefmt configuration
+# https://github.com/digitronik/prosefmt
 #
+# This file is the single source of truth for all modes and prompts.
+# Edit any prompt to fit your model, language, and writing style.
+# The picker menu updates automatically whenever you add or remove a mode.
+
+# ── General ───────────────────────────────────────────────────────────────────
+
+# Default mode — used when you run `prosefmt "text"` without --mode.
+# Change to any mode name defined below (e.g. "professional", "translate-czech").
+default_mode = "fix"
+
 # Default provider (options: ollama, openai, anthropic, openai-compat)
 default_provider = "ollama"
 
-# System prompt applied to every mode (customise to fit your writing style)
-# system_prompt = "You are a text editor. Output ONLY the rewritten text..."
+# System prompt — prepended to every mode's instruction.
+# Keep it SHORT when using local models (qwen2.5, phi3, gemma).
+system_prompt = """You are a text editor. Output ONLY the rewritten text.
+No preamble, no explanations, no \\'Here is…\\'.
+Keep technical terms, code, URLs, and markdown structure exactly as written."""
 
-# --- Providers ----------------------------------------------------------------
+# ── Providers ─────────────────────────────────────────────────────────────────
 
 [providers.ollama]
-url = "http://localhost:11434"
-model = "qwen2.5:1.5b"
+url   = "http://localhost:11434"
+model = "qwen2.5:1.5b"          # change to any model you have pulled
 
 [providers.openai]
-# API key: set PROSEFMT_OPENAI_API_KEY or OPENAI_API_KEY env var
 model = "gpt-4o-mini"
+# API key: set PROSEFMT_OPENAI_API_KEY or OPENAI_API_KEY env var
 
 [providers.anthropic]
-# API key: set PROSEFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
 model = "claude-haiku-4-5-20251001"
+# API key: set PROSEFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
 
+# Any OpenAI-compatible endpoint (Groq, Together AI, LM Studio, vLLM, etc.)
 # [providers.openai-compat]
-# url = "http://localhost:8080/v1"
-# model = "local-model"
+# url   = "https://api.groq.com/openai/v1"
+# model = "llama-3.3-70b-versatile"
+# API key: set PROSEFMT_COMPAT_API_KEY env var
 
-# --- Custom modes (add as many as you like) -----------------------------------
+# ── Modes ─────────────────────────────────────────────────────────────────────
+#
+# Fields:
+#   prompt             (required) Instruction sent to the AI
+#   label              (optional) Name shown in notifications. Default: mode name
+#   preserve_structure (optional) Keep bullet/number list prefixes. Default: true
+#   default_output     (optional) "replace" | "popup" | "clipboard". Default: "replace"
+#   provider           (optional) Override the provider for this mode only
+#   model              (optional) Override the model for this mode only
+
+# ── Text Rewriting ────────────────────────────────────────────────────────────
+
+[modes.fix]
+prompt = "Fix grammar, spelling, and punctuation only. Do not change meaning or add sentences."
+label  = "Grammar fixed"
+
+[modes.professional]
+prompt = "Rewrite in a professional tone suitable for workplace emails and Slack."
+label  = "Made professional"
+
+[modes.casual]
+prompt = "Rewrite in a casual, friendly, conversational tone."
+label  = "Made casual"
+
+[modes.rephrase]
+prompt = "Rephrase for better clarity and flow without changing the meaning."
+label  = "Rephrased"
+
+[modes.concise]
+prompt = "Make the text more concise — same meaning, fewer words."
+label  = "Made concise"
+
+[modes.expand]
+prompt = "Expand the text with more detail and explanation, keeping the same meaning."
+label  = "Expanded"
+
+[modes.email]
+prompt             = "Rewrite as a professional email with an appropriate greeting and sign-off."
+label              = "Formatted as email"
+preserve_structure = false
+
+[modes.summarize]
+prompt             = "Summarize concisely, keeping the key points."
+label              = "Summarized"
+preserve_structure = false
+default_output     = "popup"
+
+# ── Translation ───────────────────────────────────────────────────────────────
+# Remove the \'#\' characters to enable a language. Add more as you need them.
+#
+# Workflow tip — translate an incoming message without replacing it:
+#   set default_output = "popup" so the translation appears in a popup
+#   and the original text is left untouched.
+
+# [modes.translate-english]
+# prompt         = "Translate to English. Keep technical terms, code, and URLs as-is."
+# label          = "Translated to English"
+# default_output = "popup"
+
+# [modes.translate-czech]
+# prompt = "Translate to Czech. Keep technical terms, code, and URLs in English."
+# label  = "Přeloženo do češtiny"
+
+# [modes.translate-hindi]
+# prompt = "Translate to Hindi. Keep technical terms, code, and URLs in English."
+# label  = "हिंदी में अनुवादित"
 
 # [modes.translate-french]
-# prompt = "Translate to French. Keep technical terms in English."
-# label = "Translated to French"
+# prompt = "Translate to French. Keep technical terms, code, and URLs in English."
+# label  = "Traduit en français"
 
-# [modes.code-comments]
-# prompt = "Add clear, concise comments to this code."
-# label = "Comments added"
+# [modes.translate-spanish]
+# prompt = "Translate to Spanish. Keep technical terms, code, and URLs in English."
+# label  = "Traducido al español"
+
+# ── Analysis ──────────────────────────────────────────────────────────────────
+# These modes show a popup by default (don't replace the original text).
+
+# [modes.explain]
+# prompt         = "Explain this in simple terms. Be brief."
+# label          = "Explained"
+# default_output = "popup"
+
+# [modes.review]
+# prompt         = "Review this text. List any issues with grammar, clarity, or tone."
+# label          = "Reviewed"
+# default_output = "popup"
+# provider       = "openai"   # heavier task — uncomment to use a cloud model
+
+# ── Code ──────────────────────────────────────────────────────────────────────
+
+# [modes.add-comments]
+# prompt             = "Add clear, concise comments to this code. Do not change the code."
+# label              = "Comments added"
 # preserve_structure = false
-"""
+
+# [modes.commit-message]
+# prompt         = "Write a concise git commit message for this diff. Use conventional commits."
+# label          = "Commit message"
+# default_output = "popup"
+'''
