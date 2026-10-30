@@ -176,7 +176,7 @@ def init_config() -> Path:
         return path
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_DEFAULT_CONFIG_CONTENT)
+    path.write_text(_DEFAULT_CONFIG_CONTENT, encoding="utf-8")
     return path
 
 
