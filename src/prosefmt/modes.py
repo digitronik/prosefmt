@@ -7,49 +7,67 @@ import re
 BUILTIN_MODES: dict[str, dict] = {
     "fix": {
         "name": "fix",
-        "prompt": "Fix grammar, spelling, and punctuation only. Do not add or remove sentences.",
+        "prompt": (
+            "Fix all grammar, spelling, and punctuation errors. "
+            "Keep the same meaning. Keep the same number of sentences."
+        ),
         "label": "Grammar fixed",
         "preserve_structure": True,
     },
     "professional": {
         "name": "professional",
-        "prompt": "Rewrite in a professional tone suitable for workplace emails and Slack.",
+        "prompt": (
+            "Rewrite this text in a professional, formal tone. "
+            "Suitable for work emails and business messages."
+        ),
         "label": "Made professional",
         "preserve_structure": True,
     },
     "casual": {
         "name": "casual",
-        "prompt": "Rewrite in a casual, friendly, conversational tone.",
+        "prompt": (
+            "Rewrite this text in a casual, friendly tone. Keep it natural and conversational."
+        ),
         "label": "Made casual",
         "preserve_structure": True,
     },
     "rephrase": {
         "name": "rephrase",
-        "prompt": "Rephrase for better clarity and flow without changing the meaning.",
+        "prompt": (
+            "Rephrase this text for better clarity. Keep the same meaning. Use different words."
+        ),
         "label": "Rephrased",
         "preserve_structure": True,
     },
     "summarize": {
         "name": "summarize",
-        "prompt": "Summarize concisely, keeping the key points.",
+        "prompt": (
+            "Write a short summary of this text. Include only the key points. "
+            "Use 2-3 sentences maximum."
+        ),
         "label": "Summarized",
         "preserve_structure": False,
     },
     "email": {
         "name": "email",
-        "prompt": "Rewrite as a professional email with an appropriate greeting and sign-off.",
+        "prompt": (
+            "Rewrite this as a professional email. "
+            "Add a greeting at the start and a sign-off at the end."
+        ),
         "label": "Formatted as email",
         "preserve_structure": False,
     },
     "concise": {
         "name": "concise",
-        "prompt": "Make the text more concise — same meaning, fewer words.",
+        "prompt": ("Make this text shorter. Remove unnecessary words. Keep the same meaning."),
         "label": "Made concise",
         "preserve_structure": True,
     },
     "expand": {
         "name": "expand",
-        "prompt": "Expand the text with more detail and explanation, keeping the same meaning.",
+        "prompt": (
+            "Expand this text with more detail and explanation. Keep the same meaning and tone."
+        ),
         "label": "Expanded",
         "preserve_structure": True,
     },
