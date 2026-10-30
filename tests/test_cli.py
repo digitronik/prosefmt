@@ -216,6 +216,129 @@ class TestMenuCommand:
             runner.invoke(cli, ["menu", "text"])
             assert mock_gp.call_args[0][0] == "ollama"
 
+    def test_menu_with_popup_flag(self, runner):
+        with (
+            patch("prosefmt.picker.best_picker", return_value="rofi"),
+            patch("prosefmt.picker.pick", return_value="fix"),
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["menu", "--popup", "text"])
+            assert result.exit_code == 0
+            mock_popup.assert_called_once()
+
+    def test_menu_with_diff_flag(self, runner):
+        with (
+            patch("prosefmt.picker.best_picker", return_value="rofi"),
+            patch("prosefmt.picker.pick", return_value="fix"),
+            patch("prosefmt.providers.get_provider") as mock_gp,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["menu", "--diff", "bad text"])
+            assert result.exit_code == 0
+
+
+class TestPopupOutput:
+    """Test --popup flag and default_output='popup' routing."""
+
+    def test_popup_flag_shows_in_popup(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["--popup", "bad grammer"])
+            assert result.exit_code == 0
+            mock_popup.assert_called_once()
+            assert "Fixed text." in mock_popup.call_args[0][0]
+
+    def test_popup_flag_falls_back_to_stdout_when_no_tool(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.popup.show_popup", return_value=False),
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["--popup", "bad grammer"])
+            assert result.exit_code == 0
+            assert "Fixed text." in result.output
+
+    def test_popup_with_diff(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["--popup", "--diff", "bad grammer"])
+            assert result.exit_code == 0
+            mock_popup.assert_called_once()
+            # Diff output should contain diff markers
+            popup_text = mock_popup.call_args[0][0]
+            assert "---" in popup_text or "(no changes)" in popup_text
+
+    def test_default_output_popup_via_system_flag(self, runner, tmp_path, monkeypatch):
+        """When --system is set and mode.default_output='popup', result goes to popup."""
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        cfg = tmp_path / "prosefmt" / "config.toml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text("""\
+[modes.summarize]
+prompt = "Summarize."
+default_output = "popup"
+""")
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.clipboard.clipboard_read", return_value="some long text"),
+            patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
+        ):
+            mock_gp.return_value.complete.return_value = "Summary."
+            result = runner.invoke(cli, ["-m", "summarize", "-s"])
+            assert result.exit_code == 0
+            mock_popup.assert_called_once()
+
+    def test_popup_flag_overrides_default_output(self, runner):
+        """--popup flag forces popup even if mode's default_output is 'replace'."""
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed."
+            result = runner.invoke(cli, ["-m", "fix", "--popup", "text"])
+            assert result.exit_code == 0
+            mock_popup.assert_called_once()
+
+
+class TestDiffOutput:
+    """Test --diff flag."""
+
+    def test_diff_shows_changes(self, runner):
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Fixed text here."
+            result = runner.invoke(cli, ["--diff", "bad text here"])
+            assert result.exit_code == 0
+            # Should contain diff markers
+            assert "-" in result.output or "+" in result.output
+
+    def test_diff_no_changes_message(self, runner):
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "same text"
+            result = runner.invoke(cli, ["--diff", "same text"])
+            assert result.exit_code == 0
+            assert "(no changes)" in result.output
+
+    def test_diff_with_mode(self, runner):
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Professional version."
+            result = runner.invoke(cli, ["-m", "professional", "--diff", "casual version"])
+            assert result.exit_code == 0
+            assert result.output.strip() != ""
+
+    def test_diff_via_stdin(self, runner):
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["--diff"], input="bad text\n")
+            assert result.exit_code == 0
+
 
 class TestPerModeProviderOverride:
     def test_mode_provider_used_when_no_cli_flag(self, runner, tmp_path, monkeypatch):
@@ -262,3 +385,19 @@ class TestCheckCommand:
         with patch("prosefmt.picker.shutil.which", return_value=None):
             result = runner.invoke(cli, ["check"])
         assert "picker" in result.output.lower() or "menu" in result.output.lower()
+
+    def test_check_reports_popup(self, runner):
+        with (
+            patch("prosefmt.popup.shutil.which", return_value="/usr/bin/zenity"),
+            patch("prosefmt.picker.shutil.which", return_value="/usr/bin/rofi"),
+        ):
+            result = runner.invoke(cli, ["check"])
+        assert "popup" in result.output.lower() or "zenity" in result.output.lower()
+
+    def test_check_warns_no_popup(self, runner):
+        with (
+            patch("prosefmt.popup.shutil.which", return_value=None),
+            patch("prosefmt.picker.shutil.which", return_value=None),
+        ):
+            result = runner.invoke(cli, ["check"])
+        assert "popup" in result.output.lower()

@@ -4,6 +4,8 @@ Usage examples:
     prosefmt "some text with erors"              Fix grammar (default mode)
     prosefmt -m professional -s -n               Rewrite highlighted text
     echo "text" | prosefmt -m casual             Pipe + mode
+    prosefmt --popup -s -m summarize             Show result in popup
+    prosefmt --diff "text with erors"             Show what changed
     prosefmt menu --system --notify              Open mode picker
     prosefmt list                                Show available modes
     prosefmt undo                                Undo last rewrite
@@ -126,6 +128,10 @@ class ProsefmtCLI(click.Group):
                 " Rewrite highlighted text\n"
                 "  echo text | prosefmt -m casual   "
                 " Pipe + mode\n"
+                "  prosefmt --popup -s -m summarize  "
+                " Show result in popup\n"
+                "  prosefmt --diff 'text with erors' "
+                " Show what changed\n"
                 "  prosefmt menu -s -n              "
                 " Open mode picker\n"
                 "  prosefmt list                    "
@@ -201,6 +207,8 @@ def _run_rewrite(
     *,
     system: bool = False,
     clipboard: bool = False,
+    popup: bool = False,
+    show_diff: bool = False,
     provider_name: str | None = None,
     model_override: str | None = None,
     show_notify: bool = False,
@@ -210,7 +218,7 @@ def _run_rewrite(
 
     The caller is responsible for resolving input (via ``_resolve_input``).
     Output routing uses the mode's ``default_output`` field, overridden by
-    ``system`` / ``clipboard`` flags when appropriate.
+    explicit CLI flags ``--popup`` / ``--diff`` / ``--clipboard`` when set.
     """
     from dataclasses import replace
 
@@ -257,16 +265,33 @@ def _run_rewrite(
     save_undo(input_text, config.undo_file)
 
     # ------------------------------------------------------------------
+    # Diff formatting (applied before output routing)
+    # ------------------------------------------------------------------
+    display_text = result
+    if show_diff:
+        from prosefmt.diff import format_diff, has_changes
+
+        if has_changes(input_text, result):
+            # Detect if output goes to a terminal (for colour support)
+            use_color = sys.stdout.isatty()
+            display_text = format_diff(input_text, result, color=use_color)
+        else:
+            display_text = "(no changes)"
+
+    # ------------------------------------------------------------------
     # Output routing
     #
     # Priority: explicit CLI flags  >  mode.default_output  >  stdout
     #
-    # When --system is used the *input* always comes from primary selection.
-    # The *output* destination is decided by the mode's default_output
-    # ("replace" means paste back, "popup" / "clipboard" will be handled
-    # once those modules land in Phase 2).
+    # --popup flag    → always show popup
+    # --diff flag     → show diff (in popup if --popup, else stdout)
+    # --system        → use mode's default_output
+    # --clipboard     → write to clipboard
+    # otherwise       → stdout
     # ------------------------------------------------------------------
-    if system:
+    if popup:
+        output = "popup"
+    elif system:
         output = mode.default_output  # "replace" | "popup" | "clipboard"
     elif clipboard:
         output = "clipboard"
@@ -287,8 +312,13 @@ def _run_rewrite(
             notify("prosefmt", f"✓ {mode.label or mode_name}")
 
     elif output == "popup":
-        # Phase 2 — popup.py not yet implemented; fall back to stdout
-        click.echo(result)
+        from prosefmt.popup import show_popup
+
+        popup_title = f"prosefmt — {mode.label or mode_name}"
+        shown = show_popup(display_text, title=popup_title)
+        if not shown:
+            # No popup tool available — fall back to stdout
+            click.echo(display_text)
         if show_notify:
             notify("prosefmt", f"✓ {mode.label or mode_name}")
 
@@ -298,11 +328,11 @@ def _run_rewrite(
         clipboard_write(result)
         if show_notify:
             notify("prosefmt", f"✓ {mode.label or mode_name}")
-        click.echo(result)
+        click.echo(display_text)
 
     else:
         # stdout (terminal use)
-        click.echo(result)
+        click.echo(display_text)
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +387,16 @@ def cli(ctx: click.Context, config_path: Path | None) -> None:
     help="Show desktop notification.",
 )
 @click.option(
+    "--popup",
+    is_flag=True,
+    help="Show result in a popup window (don't replace text).",
+)
+@click.option(
+    "--diff",
+    is_flag=True,
+    help="Show a diff of original vs. result.",
+)
+@click.option(
     "--provider",
     "-p",
     default=None,
@@ -371,6 +411,8 @@ def run(
     system: bool,
     clipboard: bool,
     notify: bool,
+    popup: bool,
+    diff: bool,
     provider: str | None,
     model: str | None,
 ) -> None:
@@ -393,6 +435,8 @@ def run(
         input_text,
         system=system,
         clipboard=clipboard,
+        popup=popup,
+        show_diff=diff,
         provider_name=provider,
         model_override=model,
         show_notify=notify,
@@ -425,6 +469,16 @@ def run(
     help="Show desktop notification.",
 )
 @click.option(
+    "--popup",
+    is_flag=True,
+    help="Show result in a popup window (don't replace text).",
+)
+@click.option(
+    "--diff",
+    is_flag=True,
+    help="Show a diff of original vs. result.",
+)
+@click.option(
     "--provider",
     "-p",
     default=None,
@@ -438,6 +492,8 @@ def menu(
     system: bool,
     clipboard: bool,
     notify: bool,
+    popup: bool,
+    diff: bool,
     provider: str | None,
     model: str | None,
 ) -> None:
@@ -481,6 +537,8 @@ def menu(
             input_text,
             system=system,
             clipboard=clipboard,
+            popup=popup,
+            show_diff=diff,
             provider_name=provider,
             model_override=model,
             show_notify=notify,
@@ -496,6 +554,8 @@ def menu(
             input_text,
             system=system,
             clipboard=clipboard,
+            popup=popup,
+            show_diff=diff,
             provider_name=provider,
             model_override=model,
             show_notify=notify,
@@ -650,13 +710,14 @@ def config_show(ctx: click.Context) -> None:
 @cli.command("check")
 @click.pass_context
 def check(ctx: click.Context) -> None:
-    """Verify clipboard tools, picker, and AI provider are ready."""
+    """Verify clipboard tools, picker, popup, and AI provider are ready."""
     from prosefmt.clipboard import check_clipboard_tools, install_hints
     from prosefmt.picker import (
         best_picker,
         check_picker_tools,
         install_hints_picker,
     )
+    from prosefmt.popup import best_popup, check_popup_tools, install_hints_popup
     from prosefmt.providers import get_provider
 
     config: Config = ctx.obj["config"]
@@ -688,6 +749,20 @@ def check(ctx: click.Context) -> None:
                 click.echo(line)
         else:
             click.echo(f"✓ Picker: {found[0]}")
+
+    # --- Popup ---
+    popup_tool = best_popup()
+    if popup_tool:
+        click.echo(f'✓ Popup: {popup_tool}  (for --popup / default_output = "popup")')
+    else:
+        status = check_popup_tools()
+        found = [t for t, v in status.items() if v]
+        if not found:
+            click.echo('⚠  No popup tool found  (needed for --popup / default_output = "popup")')
+            for line in install_hints_popup():
+                click.echo(line)
+        else:
+            click.echo(f"✓ Popup: {found[0]}")
 
     # --- AI provider ---
     pname = config.default_provider
