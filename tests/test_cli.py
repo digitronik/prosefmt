@@ -408,6 +408,194 @@ provider = "openai"
             assert mock_gp.call_args[0][0] == "anthropic"
 
 
+class TestProviderTypeDispatch:
+    """Test that custom provider names with a type field dispatch correctly."""
+
+    def test_groq_with_openai_compat_type(self, runner, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        cfg = tmp_path / "prosefmt" / "config.toml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text("""\
+default_provider = "groq"
+
+[providers.groq]
+type = "openai-compat"
+url = "https://api.groq.com/openai/v1"
+model = "llama-3.3-70b-versatile"
+""")
+        with patch("prosefmt.providers.get_provider") as mock_gp:
+            mock_gp.return_value.complete.return_value = "Done."
+            result = runner.invoke(cli, ["text"])
+            assert result.exit_code == 0
+            # Provider name is "groq" but type-based dispatch should work
+            assert mock_gp.call_args[0][0] == "groq"
+
+
+class TestResolveOutput:
+    """Test the output resolution logic as a pure function."""
+
+    def test_popup_flag_wins(self):
+        from prosefmt.cli import _resolve_output
+
+        assert (
+            _resolve_output(
+                popup=True, show_diff=False, system=True, clipboard=False, default_output="replace"
+            )
+            == "popup"
+        )
+
+    def test_diff_with_system_forces_stdout(self):
+        from prosefmt.cli import _resolve_output
+
+        assert (
+            _resolve_output(
+                popup=False, show_diff=True, system=True, clipboard=False, default_output="replace"
+            )
+            == "stdout"
+        )
+
+    def test_system_uses_default_output(self):
+        from prosefmt.cli import _resolve_output
+
+        assert (
+            _resolve_output(
+                popup=False, show_diff=False, system=True, clipboard=False, default_output="popup"
+            )
+            == "popup"
+        )
+
+    def test_clipboard_flag(self):
+        from prosefmt.cli import _resolve_output
+
+        assert (
+            _resolve_output(
+                popup=False, show_diff=False, system=False, clipboard=True, default_output="replace"
+            )
+            == "clipboard"
+        )
+
+    def test_default_is_stdout(self):
+        from prosefmt.cli import _resolve_output
+
+        assert (
+            _resolve_output(
+                popup=False,
+                show_diff=False,
+                system=False,
+                clipboard=False,
+                default_output="replace",
+            )
+            == "stdout"
+        )
+
+
+class TestClipboardOutput:
+    """Test --clipboard flag output routing."""
+
+    def test_clipboard_output_writes_and_echoes(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.clipboard.clipboard_write") as mock_write,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["-c", "text"])
+            assert result.exit_code == 0
+            mock_write.assert_called_once_with("Fixed text.")
+            assert "Fixed text." in result.output
+
+    def test_clipboard_input_and_output(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.clipboard.clipboard_read", return_value="original"),
+            patch("prosefmt.clipboard.clipboard_write") as mock_write,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed."
+            result = runner.invoke(cli, ["-c"])
+            assert result.exit_code == 0
+            mock_write.assert_called_once_with("Fixed.")
+
+
+class TestSystemOutput:
+    """Test --system flag output routing (replace flow)."""
+
+    def test_system_replace_pastes_back(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.clipboard.clipboard_read", return_value="original text"),
+            patch("prosefmt.clipboard.clipboard_write"),
+            patch("prosefmt.clipboard.paste_to_active_window", return_value=True),
+            patch("prosefmt.clipboard.preserve_clipboard") as mock_ctx,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: None
+            mock_ctx.return_value.__exit__ = lambda s, *a: False
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["-s", "-m", "fix"])
+            assert result.exit_code == 0
+
+    def test_system_replace_fallback_no_paste_tool(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.clipboard.clipboard_read", return_value="original text"),
+            patch("prosefmt.clipboard.clipboard_write"),
+            patch("prosefmt.clipboard.paste_to_active_window", return_value=False),
+            patch("prosefmt.clipboard.preserve_clipboard") as mock_ctx,
+        ):
+            mock_ctx.return_value.__enter__ = lambda s: None
+            mock_ctx.return_value.__exit__ = lambda s, *a: False
+            mock_gp.return_value.complete.return_value = "Fixed text."
+            result = runner.invoke(cli, ["-s", "-m", "fix"])
+            assert result.exit_code == 0
+            assert "Fixed text." in result.output
+            assert "paste" in result.output.lower()
+
+
+class TestNotifyFlag:
+    """Test --notify flag across different flows."""
+
+    def test_notify_on_success(self, runner):
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.notify.notify") as mock_notify,
+        ):
+            mock_gp.return_value.complete.return_value = "Fixed."
+            result = runner.invoke(cli, ["-n", "text"])
+            assert result.exit_code == 0
+            # At least one notification call should include the mode label
+            assert mock_notify.call_count >= 1
+
+    def test_notify_on_provider_error(self, runner):
+        from prosefmt.providers.base import ProviderError
+
+        with (
+            patch("prosefmt.providers.get_provider") as mock_gp,
+            patch("prosefmt.notify.notify") as mock_notify,
+        ):
+            mock_gp.return_value.complete.side_effect = ProviderError("model error")
+            result = runner.invoke(cli, ["-n", "text"])
+            assert result.exit_code != 0
+            assert mock_notify.call_count >= 1
+
+
+class TestConfigInitOverwrite:
+    """Test config init overwrite flow."""
+
+    def test_config_init_already_exists(self, runner, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        # First init
+        runner.invoke(cli, ["config", "init"])
+        # Second init — should say "already exists"
+        result = runner.invoke(cli, ["config", "init"], input="n\n")
+        assert result.exit_code == 0
+        assert "already exists" in result.output.lower() or "keeping" in result.output.lower()
+
+    def test_config_init_overwrite_confirmed(self, runner, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        runner.invoke(cli, ["config", "init"])
+        result = runner.invoke(cli, ["config", "init"], input="y\n")
+        assert result.exit_code == 0
+        assert "restored" in result.output.lower() or "defaults" in result.output.lower()
+
+
 class TestCheckCommand:
     def test_check_command(self, runner):
         result = runner.invoke(cli, ["check"])
@@ -438,3 +626,12 @@ class TestCheckCommand:
         ):
             result = runner.invoke(cli, ["check"])
         assert "popup" in result.output.lower()
+
+    def test_check_provider_not_configured(self, runner, tmp_path, monkeypatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        cfg = tmp_path / "prosefmt" / "config.toml"
+        cfg.parent.mkdir(parents=True)
+        cfg.write_text('default_provider = "nonexistent"\n')
+        result = runner.invoke(cli, ["check"])
+        assert result.exit_code != 0
+        assert "not configured" in result.output.lower() or "config init" in result.output.lower()

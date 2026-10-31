@@ -84,6 +84,23 @@ class TestInstallHintsPopup:
         assert len(hints) > 0
         assert any("zenity" in h for h in hints)
 
+    def test_with_linux_platform_info(self):
+        from prosefmt.platform import PlatformInfo
+
+        pi = PlatformInfo(os="linux", display="x11", distro="fedora", pkg_manager="dnf")
+        with patch("prosefmt.popup.shutil.which", return_value=None):
+            hints = install_hints_popup(pi)
+        assert len(hints) > 0
+        assert any("dnf" in h for h in hints)
+
+    def test_with_macos_platform_info(self):
+        from prosefmt.platform import PlatformInfo
+
+        pi = PlatformInfo(os="macos", display="quartz", distro="macos", pkg_manager="brew")
+        with patch("prosefmt.popup.shutil.which", return_value=None):
+            hints = install_hints_popup(pi)
+        assert any("zenity" in h or "osascript" in h for h in hints)
+
 
 class TestShowPopup:
     """Test show_popup() dispatch."""
@@ -178,6 +195,66 @@ class TestPopupRofiUnit:
         assert "-e" in cmd
 
 
+class TestPopupYadUnit:
+    """Unit-test the yad dispatcher."""
+
+    def test_calls_yad_text_info(self):
+        from prosefmt.popup import _popup_yad
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch("prosefmt.popup.subprocess.run", return_value=mock_result) as mock_run:
+            result = _popup_yad("Hello world", "Test Title")
+
+        assert result is True
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "yad"
+        assert "--text-info" in cmd
+        assert "Test Title" in cmd
+
+
+class TestPopupKdialogUnit:
+    """Unit-test the kdialog dispatcher."""
+
+    def test_calls_kdialog_textbox(self):
+        from prosefmt.popup import _popup_kdialog
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with (
+            patch("prosefmt.popup.subprocess.run", return_value=mock_result) as mock_run,
+            patch("prosefmt.popup.os.unlink"),
+        ):
+            result = _popup_kdialog("Hello world", "Test Title")
+
+        assert result is True
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "kdialog"
+        assert "--textbox" in cmd
+
+
+class TestPopupOsascriptUnit:
+    """Unit-test the osascript (macOS) dispatcher."""
+
+    def test_calls_osascript(self):
+        from prosefmt.popup import _popup_osascript
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with (
+            patch("prosefmt.popup.subprocess.run", return_value=mock_result) as mock_run,
+            patch("prosefmt.popup.os.unlink"),
+        ):
+            result = _popup_osascript("Hello world", "Test Title")
+
+        assert result is True
+        cmd = mock_run.call_args[0][0]
+        assert cmd[0] == "osascript"
+
+
 class TestPopupNotifySendUnit:
     """Unit-test the notify-send fallback."""
 
@@ -206,3 +283,33 @@ class TestPopupNotifySendUnit:
         cmd = mock_run.call_args[0][0]
         body_arg = cmd[-1]
         assert body_arg == short_text
+
+
+class TestShowPopupDispatchEdgeCases:
+    """Edge cases for show_popup dispatch."""
+
+    def test_unknown_dispatcher_returns_false(self):
+        with (
+            patch("prosefmt.popup.best_popup", return_value="unknown_tool"),
+            patch.dict("prosefmt.popup._DISPATCHERS", {}, clear=True),
+        ):
+            assert show_popup("text") is False
+
+    def test_delegates_to_kdialog(self):
+        stub = MagicMock(return_value=True)
+        with (
+            patch("prosefmt.popup.best_popup", return_value="kdialog"),
+            patch.dict("prosefmt.popup._DISPATCHERS", {"kdialog": stub}),
+        ):
+            result = show_popup("text", title="popup title")
+            assert result is True
+            stub.assert_called_once_with("text", "popup title")
+
+    def test_delegates_to_osascript(self):
+        stub = MagicMock(return_value=True)
+        with (
+            patch("prosefmt.popup.best_popup", return_value="osascript"),
+            patch.dict("prosefmt.popup._DISPATCHERS", {"osascript": stub}),
+        ):
+            result = show_popup("text")
+            assert result is True

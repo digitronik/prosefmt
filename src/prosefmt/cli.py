@@ -162,17 +162,24 @@ class ProsefmtCLI(click.Group):
 def _resolve_input(text: str | None, clipboard: bool, system: bool) -> str:
     """Figure out where the input text comes from.
 
-    ``--system``    reads the **primary** selection (highlighted text).
-    ``--clipboard`` reads the **clipboard** selection (Ctrl+C buffer).
-    On macOS / Windows both resolve to the single system clipboard.
+    ``--system``  on Linux reads the primary selection (highlighted text)
+                  and falls back to the clipboard if primary is empty
+                  (common on Wayland — Slack, VS Code, Chromium often
+                  don't set the primary selection).
+                  On macOS / Windows reads the single system clipboard.
+    ``--clipboard`` reads the clipboard selection (Ctrl+C buffer).
     """
     if text:
         return text
 
     if system:
         from prosefmt.clipboard import clipboard_read
+        from prosefmt.platform import Platform, detect_platform
 
-        return clipboard_read(selection="primary")
+        plat = detect_platform()
+        if plat in (Platform.LINUX_X11, Platform.LINUX_WAYLAND):
+            return clipboard_read(selection="auto")
+        return clipboard_read(selection="clipboard")
 
     if clipboard:
         from prosefmt.clipboard import clipboard_read
@@ -198,6 +205,31 @@ def _no_input_error(system: bool, show_notify: bool) -> None:
         notify("prosefmt", f"✗ {msg}", urgency="critical")
     click.echo(f"Error: {msg}", err=True)
     raise SystemExit(1)
+
+
+def _resolve_output(
+    *,
+    popup: bool,
+    show_diff: bool,
+    system: bool,
+    clipboard: bool,
+    default_output: str,
+) -> str:
+    """Determine the output channel from CLI flags and mode config.
+
+    Priority: explicit CLI flags  >  mode.default_output  >  stdout
+
+    Returns one of ``"popup"`` | ``"replace"`` | ``"clipboard"`` | ``"stdout"``.
+    """
+    if popup:
+        return "popup"
+    if show_diff and system:
+        return "stdout"
+    if system:
+        return default_output
+    if clipboard:
+        return "clipboard"
+    return "stdout"
 
 
 def _run_rewrite(
@@ -268,29 +300,13 @@ def _run_rewrite(
 
     save_undo(input_text, config.undo_file)
 
-    # ------------------------------------------------------------------
-    # Output routing
-    #
-    # Priority: explicit CLI flags  >  mode.default_output  >  stdout
-    #
-    # --popup flag    → always show popup
-    # --system        → use mode's default_output
-    # --clipboard     → write to clipboard
-    # --diff flag     → forces stdout (never silently replace)
-    # otherwise       → stdout
-    # ------------------------------------------------------------------
-    if popup:
-        output = "popup"
-    elif show_diff and system:
-        # User wants to SEE the diff — don't silently replace in-place.
-        # Still perform the rewrite (result is ready), but show diff on stdout.
-        output = "stdout"
-    elif system:
-        output = mode.default_output  # "replace" | "popup" | "clipboard"
-    elif clipboard:
-        output = "clipboard"
-    else:
-        output = "stdout"
+    output = _resolve_output(
+        popup=popup,
+        show_diff=show_diff,
+        system=system,
+        clipboard=clipboard,
+        default_output=mode.default_output,
+    )
 
     # ------------------------------------------------------------------
     # Diff formatting (applied before output routing)
@@ -316,7 +332,14 @@ def _run_rewrite(
 
         with preserve_clipboard():
             clipboard_write(result)
-            paste_to_active_window()
+            pasted = paste_to_active_window()
+        if not pasted:
+            click.echo(display_text)
+            click.echo(
+                "⚠ Could not paste — no paste tool found. "
+                "Result is on the clipboard; paste manually with Ctrl+V.",
+                err=True,
+            )
         if show_notify:
             notify("prosefmt", f"✓ {mode.label or mode_name}")
 

@@ -45,8 +45,7 @@ if TYPE_CHECKING:
 # osascript (macOS native) is last — fzf is preferred when available.
 _PICKER_PRIORITY: list[str] = ["rofi", "wofi", "fuzzel", "dmenu", "zenity", "fzf", "osascript"]
 
-# Pen-to-square icon (Font Awesome 6 Free Solid \uf044) + label
-_DEFAULT_PROMPT = "\uf044 prosefmt"
+_DEFAULT_PROMPT = "✎ prosefmt"
 
 
 def available_pickers() -> list[str]:

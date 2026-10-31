@@ -7,6 +7,12 @@ import pytest
 from prosefmt.config import Config, ModeConfig, ProviderConfig
 
 
+@pytest.fixture(autouse=True)
+def _isolate_state(tmp_path, monkeypatch):
+    """Redirect XDG_STATE_HOME so undo files never touch the real filesystem."""
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+
 @pytest.fixture()
 def default_config(tmp_path) -> Config:
     """A Config with defaults and a temp undo file."""

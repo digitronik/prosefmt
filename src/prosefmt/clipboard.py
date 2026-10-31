@@ -10,41 +10,18 @@ No external Python dependencies — uses platform-native CLI tools:
 from __future__ import annotations
 
 import contextlib
-import os
-import platform
 import shutil
 import subprocess
 import sys
 import time
 from collections.abc import Generator
 from contextlib import contextmanager
-from enum import Enum, auto
 from typing import TYPE_CHECKING
+
+from prosefmt.platform import Platform, detect_platform
 
 if TYPE_CHECKING:
     from prosefmt.platform import PlatformInfo
-
-
-class Platform(Enum):
-    LINUX_X11 = auto()
-    LINUX_WAYLAND = auto()
-    MACOS = auto()
-    WINDOWS = auto()
-    UNKNOWN = auto()
-
-
-def detect_platform() -> Platform:
-    system = platform.system()
-    if system == "Darwin":
-        return Platform.MACOS
-    if system == "Windows":
-        return Platform.WINDOWS
-    if system == "Linux":
-        session = os.environ.get("XDG_SESSION_TYPE", "").lower()
-        if session == "wayland":
-            return Platform.LINUX_WAYLAND
-        return Platform.LINUX_X11
-    return Platform.UNKNOWN
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +112,12 @@ def clipboard_write(text: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def paste_to_active_window() -> None:
-    """Simulate Ctrl+V / Cmd+V in the currently focused window."""
+def paste_to_active_window() -> bool:
+    """Simulate Ctrl+V / Cmd+V in the currently focused window.
+
+    Returns ``True`` if a paste tool was found and invoked, ``False``
+    if no tool is available (caller should fall back or error).
+    """
     plat = detect_platform()
 
     if plat == Platform.LINUX_X11:
@@ -145,30 +126,35 @@ def paste_to_active_window() -> None:
             check=False,
             capture_output=True,
         )
+        return True
 
-    elif plat == Platform.LINUX_WAYLAND:
+    if plat == Platform.LINUX_WAYLAND:
         if shutil.which("wtype"):
             subprocess.run(
                 ["wtype", "-M", "ctrl", "v", "-m", "ctrl"],
                 check=False,
                 capture_output=True,
             )
-        elif shutil.which("ydotool"):
+            return True
+        if shutil.which("ydotool"):
             subprocess.run(
                 ["ydotool", "key", "29:1", "47:1", "47:0", "29:0"],
                 check=False,
                 capture_output=True,
             )
+            return True
+        return False
 
-    elif plat == Platform.MACOS:
+    if plat == Platform.MACOS:
         applescript = 'tell application "System Events" to keystroke "v" using command down'
         subprocess.run(
             ["osascript", "-e", applescript],
             check=False,
             capture_output=True,
         )
+        return True
 
-    elif plat == Platform.WINDOWS:
+    if plat == Platform.WINDOWS:
         ps_cmd = (
             "Add-Type -AssemblyName System.Windows.Forms; "
             '[System.Windows.Forms.SendKeys]::SendWait("^v")'
@@ -178,6 +164,9 @@ def paste_to_active_window() -> None:
             check=False,
             capture_output=True,
         )
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +283,9 @@ def _targeted_hints(
 def _run_stdout(cmd: list[str]) -> str:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=5)
-        return result.stdout.strip() if result.returncode == 0 else ""
+        # Only strip trailing newlines (tool artifact), preserve leading whitespace
+        # so indentation in code snippets survives clipboard round-trips.
+        return result.stdout.rstrip("\n") if result.returncode == 0 else ""
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return ""
 

@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 
-from prosefmt.clipboard import Platform, detect_platform
+from prosefmt.platform import Platform, detect_platform
 from prosefmt.platform import esc_applescript as _esc_applescript
 
 

@@ -78,6 +78,32 @@ class TestInstallHints:
         assert len(hints) > 0
         assert any("rofi" in h for h in hints)
 
+    def test_with_linux_platform_info(self):
+        from prosefmt.platform import PlatformInfo
+
+        pi = PlatformInfo(os="linux", display="x11", distro="fedora", pkg_manager="dnf")
+        with patch("prosefmt.picker.shutil.which", return_value=None):
+            hints = install_hints_picker(pi)
+        assert len(hints) > 0
+        assert any("dnf" in h for h in hints)
+
+    def test_with_wayland_platform_info(self):
+        from prosefmt.platform import PlatformInfo
+
+        pi = PlatformInfo(os="linux", display="wayland", distro="fedora", pkg_manager="dnf")
+        with patch("prosefmt.picker.shutil.which", return_value=None):
+            hints = install_hints_picker(pi)
+        assert len(hints) > 0
+        assert any("wofi" in h for h in hints)
+
+    def test_with_macos_platform_info(self):
+        from prosefmt.platform import PlatformInfo
+
+        pi = PlatformInfo(os="macos", display="quartz", distro="macos", pkg_manager="brew")
+        with patch("prosefmt.picker.shutil.which", return_value=None):
+            hints = install_hints_picker(pi)
+        assert any("fzf" in h for h in hints)
+
 
 class TestPick:
     """Test pick() dispatch.
@@ -152,6 +178,164 @@ class TestPickRofiUnit:
 
         with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
             assert _pick_rofi(["fix"], "test") is None
+
+
+class TestPickWofiUnit:
+    """Unit-test the wofi dispatcher."""
+
+    def test_returns_selection(self):
+        from prosefmt.picker import _pick_wofi
+
+        mock_result = MagicMock()
+        mock_result.stdout = "rephrase\n"
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_wofi(["fix", "rephrase"], "test") == "rephrase"
+
+    def test_returns_none_on_cancel(self):
+        from prosefmt.picker import _pick_wofi
+
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_wofi(["fix"], "test") is None
+
+
+class TestPickFuzzelUnit:
+    """Unit-test the fuzzel dispatcher."""
+
+    def test_returns_selection(self):
+        from prosefmt.picker import _pick_fuzzel
+
+        mock_result = MagicMock()
+        mock_result.stdout = "fix\n"
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_fuzzel(["fix", "rephrase"], "test") == "fix"
+
+    def test_returns_none_on_cancel(self):
+        from prosefmt.picker import _pick_fuzzel
+
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_fuzzel(["fix"], "test") is None
+
+
+class TestPickDmenuUnit:
+    """Unit-test the dmenu dispatcher."""
+
+    def test_returns_selection(self):
+        from prosefmt.picker import _pick_dmenu
+
+        mock_result = MagicMock()
+        mock_result.stdout = "casual\n"
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_dmenu(["fix", "casual"], "test") == "casual"
+
+    def test_returns_none_on_cancel(self):
+        from prosefmt.picker import _pick_dmenu
+
+        mock_result = MagicMock()
+        mock_result.stdout = ""
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_dmenu(["fix"], "test") is None
+
+
+class TestPickZenityUnit:
+    """Unit-test the zenity dispatcher."""
+
+    def test_returns_selection(self):
+        from prosefmt.picker import _pick_zenity
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "summarize\n"
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_zenity(["fix", "summarize"], "test") == "summarize"
+
+    def test_returns_none_on_cancel(self):
+        from prosefmt.picker import _pick_zenity
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_zenity(["fix"], "test") is None
+
+    def test_custom_prompt_entry(self):
+        """Selecting 'Custom prompt…' should open an entry dialog."""
+        from prosefmt.picker import _pick_zenity
+
+        list_result = MagicMock()
+        list_result.returncode = 0
+        list_result.stdout = "Custom prompt…\n"
+
+        entry_result = MagicMock()
+        entry_result.stdout = "translate to french\n"
+
+        with patch(
+            "prosefmt.picker.subprocess.run",
+            side_effect=[list_result, entry_result],
+        ):
+            assert _pick_zenity(["fix"], "test") == "translate to french"
+
+    def test_custom_prompt_cancelled(self):
+        from prosefmt.picker import _pick_zenity
+
+        list_result = MagicMock()
+        list_result.returncode = 0
+        list_result.stdout = "Custom prompt…\n"
+
+        entry_result = MagicMock()
+        entry_result.stdout = ""
+
+        with patch(
+            "prosefmt.picker.subprocess.run",
+            side_effect=[list_result, entry_result],
+        ):
+            assert _pick_zenity(["fix"], "test") is None
+
+
+class TestPickOsascriptUnit:
+    """Unit-test the osascript (macOS) dispatcher."""
+
+    def test_returns_selection(self):
+        from prosefmt.picker import _pick_osascript
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "professional\n"
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_osascript(["fix", "professional"], "test") == "professional"
+
+    def test_returns_none_on_cancel(self):
+        from prosefmt.picker import _pick_osascript
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_osascript(["fix"], "test") is None
+
+    def test_returns_none_on_false(self):
+        """osascript returns 'false' when the user clicks Cancel."""
+        from prosefmt.picker import _pick_osascript
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "false\n"
+
+        with patch("prosefmt.picker.subprocess.run", return_value=mock_result):
+            assert _pick_osascript(["fix"], "test") is None
 
 
 class TestPickFzfUnit:

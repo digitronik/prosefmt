@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from prosefmt.clipboard import Platform
 from prosefmt.notify import _esc_xml, notify
+from prosefmt.platform import Platform
 from prosefmt.platform import esc_applescript as _esc_applescript
 
 
