@@ -15,7 +15,8 @@
 
 Highlight text in **any application** — browser, email, Slack, VS Code, terminal — press your
 hotkey, and prosefmt rewrites it in place. Grammar fixed, tone shifted, translated, summarized —
-all without leaving the app you're in.
+all without leaving the app you're in. (On Linux with X11/Wayland; on macOS/Windows use
+Ctrl+C first — the text is read from the clipboard.)
 
 ```
 $ prosefmt "i can haz good grammer?"
@@ -79,7 +80,7 @@ prosefmt is different:
 
 | | **prosefmt** | GUI writing tools |
 |---|---|---|
-| **Architecture** | CLI — 2 Python deps, ~15 KB | Electron/PyQt GUI, 100–200 MB |
+| **Architecture** | CLI — 2 Python deps, ~90 KB | Electron/PyQt GUI, 100–200 MB |
 | **Install** | `pip install prosefmt` | Download installer or clone repo |
 | **Composability** | Pipes, scripts, shell automation | Click through menus |
 | **Works on Wayland** | Yes — native `wl-clipboard` + `wtype` | Usually broken |
@@ -169,11 +170,11 @@ src/prosefmt/
 ├── cli.py              CLI entry point (Click) — subcommands, flags, routing
 ├── config.py           TOML config loading — modes, providers, system prompt
 ├── core.py             Rewrite engine — prompt assembly, list preservation
-├── modes.py            Built-in mode definitions + list-structure helpers
+├── modes.py            List-structure preservation helpers
 ├── clipboard.py        Cross-platform clipboard (X11, Wayland, macOS, Windows)
 ├── picker.py           Mode picker UI (rofi, wofi, fuzzel, dmenu, zenity, fzf)
 ├── popup.py            Result display popup (zenity, yad, kdialog, rofi)
-├── diff.py             Text diff formatting (unified + inline, ANSI colour)
+├── diff.py             Text diff formatting (unified diff, ANSI colour)
 ├── notify.py           Desktop notifications (notify-send, osascript, toast)
 └── providers/
     ├── base.py         Provider protocol
@@ -183,8 +184,9 @@ src/prosefmt/
 ```
 
 **Design principles:**
-- **Config owns all prompts** — zero prompts hardcoded in Python. Every instruction sent to
-  the AI lives in `config.toml` and is user-editable.
+- **Config owns all prompts** — every mode prompt and system instruction lives in
+  ``default_config.toml`` (shipped with the package) and is loaded at runtime.  Python code
+  never hardcodes prompt text.  Users can override any prompt via their ``config.toml``.
 - **Platform tools, not Python deps** — clipboard, picker, popup, notifications are all
   subprocess calls to native OS tools. No PyQt, no Tkinter, no heavy GUI libraries.
 - **Two runtime dependencies** — `click` (CLI framework) and `httpx` (HTTP client). That's it.
@@ -407,8 +409,10 @@ prosefmt -p openai --model gpt-4o "some text here"
 
 ### System-wide rewriting
 
-The killer feature. Highlight text in **any app**, press your hotkey, and the rewritten
+The killer feature on Linux: highlight text, press your hotkey, and the rewritten
 text replaces the original — without switching windows or touching the mouse.
+On macOS/Windows, copy the text first (Ctrl+C / Cmd+C); prosefmt reads from
+the clipboard.
 
 ```bash
 # Read highlighted text → rewrite → paste back in-place
@@ -445,7 +449,7 @@ prosefmt menu -s -n
 prosefmt menu -c
 ```
 
-The picker auto-detects the best installed tool: **rofi → wofi → fuzzel → dmenu → zenity → fzf**.
+The picker auto-detects the best installed tool: **rofi → wofi → fuzzel → dmenu → zenity → fzf → osascript**.
 
 #### Free-form prompts
 
@@ -499,7 +503,7 @@ Perfect for translations and summaries where you want to **read** the result, no
 # Show rewrite in a popup
 prosefmt --popup -s -m summarize
 
-# Popup auto-detects: zenity → yad → kdialog → rofi → notify-send
+# Popup auto-detects: zenity → yad → kdialog → rofi → osascript → notify-send
 ```
 
 Popup tools can be checked with `prosefmt check`.
@@ -826,8 +830,8 @@ AutoHotkey script:
 
 4. **Tool auto-detection** — The picker, popup, and notification systems each maintain a
    priority list of native tools. prosefmt picks the best available one at runtime:
-   - **Picker:** rofi → wofi → fuzzel → dmenu → zenity → fzf
-   - **Popup:** zenity → yad → kdialog → rofi → notify-send
+   - **Picker:** rofi → wofi → fuzzel → dmenu → zenity → fzf → osascript
+   - **Popup:** zenity → yad → kdialog → rofi → osascript → notify-send
    - **Notifications:** notify-send (Linux), osascript (macOS), PowerShell toast (Windows)
 
 ---
@@ -840,7 +844,7 @@ Config file locations:
 |:---|:---|
 | Linux / macOS | `~/.config/prosefmt/config.toml` |
 | Linux (custom) | `$XDG_CONFIG_HOME/prosefmt/config.toml` |
-| Windows | `%APPDATA%\prosefmt\config.toml` |
+| Windows | `%LOCALAPPDATA%\prosefmt\config.toml` |
 
 Create it: `prosefmt config init` · View it: `prosefmt config show`
 
@@ -856,12 +860,14 @@ Create it: `prosefmt config init` · View it: `prosefmt config show`
 
 ### Provider fields (`[providers.<name>]`)
 
-| Field | Description |
-|:---|:---|
-| `url` | API endpoint URL |
-| `model` | Default model name |
-| `temperature` | Override global temperature for this provider |
-| `seed` | Override global seed for this provider |
+| Field | Type | Description |
+|:---|:---|:---|
+| `type` | string | Provider type: `"ollama"`, `"openai-compat"`, `"anthropic"` — inferred from name if empty |
+| `url` | string | API endpoint URL |
+| `model` | string | Default model name |
+| `api_key_env` | string | Custom env var name for the API key (e.g. `"GROQ_API_KEY"`) |
+| `temperature` | float | Override global temperature for this provider |
+| `seed` | int | Override global seed for this provider |
 
 > **API keys** are set via environment variables — never put them in `config.toml`.
 
@@ -882,6 +888,17 @@ Create it: `prosefmt config init` · View it: `prosefmt config show`
 | `provider` | string | global default | Override provider for this mode |
 | `model` | string | provider default | Override model for this mode |
 | `default_output` | string | `"replace"` | Output routing: `"replace"`, `"popup"`, or `"clipboard"` |
+
+### Platform section (`[platform]`)
+
+Auto-detected on first run. Override if detection is wrong.
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `os` | string | `"linux"`, `"macos"`, or `"windows"` |
+| `display` | string | `"x11"`, `"wayland"`, or `""` (non-Linux) |
+| `distro` | string | Linux distro name (e.g. `"fedora"`, `"ubuntu"`) or `""` |
+| `pkg_manager` | string | Package manager (e.g. `"dnf"`, `"apt"`, `"pacman"`) or `""` |
 
 ### Full example config
 
@@ -983,6 +1000,7 @@ prosefmt --popup                   Show result in popup window
 prosefmt --diff                    Show diff of original vs. result
 prosefmt -p / --provider PROVIDER  Override AI provider
 prosefmt --model MODEL             Override AI model
+prosefmt --config-path PATH        Use a custom config file
 
 prosefmt menu                     Open mode picker, then rewrite
 prosefmt menu -s -n               Highlight → picker → rewrite → paste back
@@ -992,6 +1010,7 @@ prosefmt list                     List all modes (human-readable)
 prosefmt list --names             Mode names only (one per line)
 prosefmt undo                     Print the original text from last rewrite
 prosefmt undo -s                  Paste original back to active window
+prosefmt undo -c                  Write original text to clipboard
 prosefmt check                    Verify clipboard, picker, popup, provider
 prosefmt config init              Create config file
 prosefmt config show              Show active configuration
@@ -1086,7 +1105,7 @@ more nuanced instructions. The config file includes tips for prompt writing.
 <summary><strong>How is prosefmt different from Writing Tools / AI Shortcuts?</strong></summary>
 
 Those are GUI desktop apps (100–200 MB, Electron or PyQt5). They can't be piped, scripted,
-or used from hotkeys without their own UI. Most are broken on Wayland. prosefmt is a 15 KB
+or used from hotkeys without their own UI. Most are broken on Wayland. prosefmt is a ~90 KB
 CLI tool with 2 Python dependencies that composes with Unix pipes and works everywhere.
 
 </details>
