@@ -30,6 +30,12 @@ from __future__ import annotations
 import shutil
 import subprocess
 from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+from prosefmt.platform import esc_applescript as _esc
+
+if TYPE_CHECKING:
+    from prosefmt.platform import PlatformInfo
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -77,26 +83,22 @@ def check_picker_tools() -> dict[str, bool]:
     return {t: shutil.which(t) is not None for t in _PICKER_PRIORITY}
 
 
-def install_hints_picker(platform_info: object | None = None) -> list[str]:
+def install_hints_picker(platform_info: PlatformInfo | None = None) -> list[str]:
     """Return human-readable install suggestions for picker tools.
 
-    When *platform_info* (a :class:`~prosefmt.platform.PlatformInfo`) is
-    provided the hints are narrowed to the relevant package manager.
+    When *platform_info* is provided the hints are narrowed to the
+    relevant package manager.
     """
     if best_picker() is not None:
         return []
 
     if platform_info is not None:
-        os_name: str = getattr(platform_info, "os", "")
-        display: str = getattr(platform_info, "display", "")
-        install_cmd = getattr(platform_info, "install_cmd", None)
-
-        if os_name == "macos":
+        if platform_info.os == "macos":
             return ["  Install:  brew install fzf"]
 
-        if os_name == "linux" and install_cmd is not None:
-            tool = "wofi" if display == "wayland" else "rofi"
-            cmd = install_cmd(tool)
+        if platform_info.os == "linux":
+            tool = "wofi" if platform_info.display == "wayland" else "rofi"
+            cmd = platform_info.install_cmd(tool)
             if cmd:
                 alt = "rofi" if tool == "wofi" else "fzf"
                 return [f"  Install:  {cmd}  (or: {alt})"]
@@ -246,9 +248,8 @@ def _pick_osascript(choices: list[str], prompt: str) -> str | None:
     Does not support free-form input — user must select from the list.
     Install ``fzf`` (``brew install fzf``) for free-form support.
     """
-    items = ", ".join(f'"{c}"' for c in choices)
-    esc_prompt = prompt.replace("\\", "\\\\").replace('"', '\\"')
-    script = f'choose from list {{{items}}} with title "prosefmt" with prompt "{esc_prompt}"'
+    items = ", ".join(f'"{_esc(c)}"' for c in choices)
+    script = f'choose from list {{{items}}} with title "prosefmt" with prompt "{_esc(prompt)}"'
     result = subprocess.run(
         ["osascript", "-e", script],
         capture_output=True,

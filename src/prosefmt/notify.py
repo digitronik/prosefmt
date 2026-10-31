@@ -13,6 +13,7 @@ import subprocess
 import sys
 
 from prosefmt.clipboard import Platform, detect_platform
+from prosefmt.platform import esc_applescript as _esc_applescript
 
 
 def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int = 3000) -> None:
@@ -61,11 +62,6 @@ def notify(title: str, body: str = "", urgency: str = "normal", timeout_ms: int 
 
     except Exception:
         _stderr_fallback(title, body)
-
-
-def _esc_applescript(s: str) -> str:
-    """Escape for AppleScript string interpolation."""
-    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
 
 
 def _esc_xml(s: str) -> str:
