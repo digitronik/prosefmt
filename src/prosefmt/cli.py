@@ -687,7 +687,20 @@ def config_init() -> None:
     else:
         click.echo(f"✓ Config file created: {path}")
 
-    click.echo("  Edit it to set your provider, model, and custom modes.\n")
+    # Show detected platform
+    config = Config.load(path)
+    pi = config.platform
+    click.echo()
+    click.echo("  Detected platform:")
+    click.echo(f"    OS:              {pi.os}")
+    if pi.display:
+        click.echo(f"    Display server:  {pi.display}")
+    if pi.distro:
+        click.echo(f"    Distro:          {pi.distro}")
+    if pi.pkg_manager:
+        click.echo(f"    Package manager: {pi.pkg_manager}")
+    click.echo()
+    click.echo("  Edit config to set your provider, model, and custom modes.\n")
 
     missing = check_clipboard_tools()
     if missing:
@@ -697,9 +710,9 @@ def config_init() -> None:
         )
         for tool in missing:
             click.echo(f"   • {tool}")
-        hints = install_hints()
+        hints = install_hints(pi)
         if hints:
-            click.echo("\n  Install with one of these commands:")
+            click.echo("  Install:")
             for line in hints:
                 click.echo(line)
         click.echo("\n  (Pipe mode — echo 'text' | prosefmt — works without these tools.)")
@@ -747,15 +760,15 @@ def check(ctx: click.Context) -> None:
     from prosefmt.providers import get_provider
 
     config: Config = ctx.obj["config"]
+    pi = config.platform
     ok = True
 
     # --- Clipboard tools ---
     missing = check_clipboard_tools()
     if missing:
         click.echo(f"✗ Missing clipboard tools: {', '.join(missing)}")
-        hints = install_hints()
+        hints = install_hints(pi)
         if hints:
-            click.echo("  Install with one of these commands:")
             for line in hints:
                 click.echo(line)
         ok = False
@@ -768,7 +781,7 @@ def check(ctx: click.Context) -> None:
         click.echo(f"✓ Picker: {picker}  (for 'prosefmt menu')")
     else:
         click.echo("⚠  No picker tool found  (needed for 'prosefmt menu')")
-        for line in install_hints_picker():
+        for line in install_hints_picker(pi):
             click.echo(line)
 
     # --- Popup ---
@@ -777,7 +790,7 @@ def check(ctx: click.Context) -> None:
         click.echo(f'✓ Popup: {popup_tool}  (for --popup / default_output = "popup")')
     else:
         click.echo('⚠  No popup tool found  (needed for --popup / default_output = "popup")')
-        for line in install_hints_popup():
+        for line in install_hints_popup(pi):
             click.echo(line)
 
     # --- AI provider ---
@@ -789,10 +802,15 @@ def check(ctx: click.Context) -> None:
             click.echo(f"✓ Provider '{pname}' is reachable  (model: {pconfig.model})")
         else:
             if pname == "ollama":
+                install_hint = ""
+                cmd = pi.install_cmd("ollama")
+                if cmd:
+                    install_hint = f"\n  Install Ollama:  {cmd}"
                 click.echo(
                     f"✗ Provider '{pname}' is not reachable\n"
                     "  Start Ollama:   ollama serve\n"
                     f"  Pull a model:   ollama pull {pconfig.model}"
+                    f"{install_hint}"
                 )
             elif pname in ("openai", "anthropic", "openai-compat"):
                 env_var = {

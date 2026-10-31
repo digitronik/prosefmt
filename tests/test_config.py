@@ -225,6 +225,41 @@ url = "http://localhost:1234/v1"
         assert config.providers["local"].url == "http://localhost:1234/v1"
 
 
+class TestPlatformConfig:
+    def test_platform_from_toml(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[platform]
+os = "macos"
+display = "quartz"
+distro = "macos"
+pkg_manager = "brew"
+""")
+        config = Config.load(cfg_file)
+        assert config.platform.os == "macos"
+        assert config.platform.pkg_manager == "brew"
+
+    def test_platform_autodetected_when_missing(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('default_mode = "fix"\n')
+        config = Config.load(cfg_file)
+        # Should auto-detect — just verify it's populated
+        assert config.platform.os in ("linux", "macos", "windows", "unknown")
+
+    def test_platform_partial_override(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[platform]
+os = "linux"
+pkg_manager = "dnf"
+""")
+        config = Config.load(cfg_file)
+        assert config.platform.os == "linux"
+        assert config.platform.pkg_manager == "dnf"
+        # display and distro filled by auto-detection
+        assert config.platform.display != ""
+
+
 class TestInitConfig:
     def test_creates_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
@@ -250,3 +285,12 @@ class TestInitConfig:
         assert created
         assert path2 == path
         assert "prosefmt" in path.read_text(encoding="utf-8").lower()
+
+    def test_config_includes_platform_section(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        path, _ = init_config()
+        content = path.read_text(encoding="utf-8")
+        assert "[platform]" in content
+        assert "pkg_manager" in content

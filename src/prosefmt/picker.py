@@ -36,7 +36,8 @@ from collections.abc import Callable
 # ---------------------------------------------------------------------------
 
 # Priority order: first tool found on PATH is used.
-_PICKER_PRIORITY: list[str] = ["rofi", "wofi", "fuzzel", "dmenu", "zenity", "fzf"]
+# osascript (macOS native) is last — fzf is preferred when available.
+_PICKER_PRIORITY: list[str] = ["rofi", "wofi", "fuzzel", "dmenu", "zenity", "fzf", "osascript"]
 
 # Pen-to-square icon (Font Awesome 6 Free Solid \uf044) + label
 _DEFAULT_PROMPT = "\uf044 prosefmt"
@@ -76,17 +77,38 @@ def check_picker_tools() -> dict[str, bool]:
     return {t: shutil.which(t) is not None for t in _PICKER_PRIORITY}
 
 
-def install_hints_picker() -> list[str]:
-    """Return human-readable install suggestions for picker tools."""
+def install_hints_picker(platform_info: object | None = None) -> list[str]:
+    """Return human-readable install suggestions for picker tools.
+
+    When *platform_info* (a :class:`~prosefmt.platform.PlatformInfo`) is
+    provided the hints are narrowed to the relevant package manager.
+    """
     if best_picker() is not None:
         return []
+
+    if platform_info is not None:
+        os_name: str = getattr(platform_info, "os", "")
+        display: str = getattr(platform_info, "display", "")
+        install_cmd = getattr(platform_info, "install_cmd", None)
+
+        if os_name == "macos":
+            return ["  Install:  brew install fzf"]
+
+        if os_name == "linux" and install_cmd is not None:
+            tool = "wofi" if display == "wayland" else "rofi"
+            cmd = install_cmd(tool)
+            if cmd:
+                alt = "rofi" if tool == "wofi" else "fzf"
+                return [f"  Install:  {cmd}  (or: {alt})"]
+
+    # Fallback — show all common options
     return [
         "  Install at least one picker tool:",
         "  # Fedora / RHEL:  sudo dnf install rofi",
         "  # Ubuntu / Mint:  sudo apt install rofi",
         "  # Arch / Manjaro: sudo pacman -S rofi",
         "  # Wayland users:  sudo dnf install wofi   (or: fuzzel)",
-        "  # Anywhere:       pip install fzf  (or: sudo apt install fzf)",
+        "  # macOS:          brew install fzf",
     ]
 
 
@@ -218,6 +240,28 @@ def _pick_fzf(choices: list[str], prompt: str) -> str | None:
     return lines[0] or None  # free-form query (returncode == 1)
 
 
+def _pick_osascript(choices: list[str], prompt: str) -> str | None:
+    """macOS native list picker via ``choose from list``.
+
+    Does not support free-form input — user must select from the list.
+    Install ``fzf`` (``brew install fzf``) for free-form support.
+    """
+    items = ", ".join(f'"{c}"' for c in choices)
+    esc_prompt = prompt.replace("\\", "\\\\").replace('"', '\\"')
+    script = f'choose from list {{{items}}} with title "prosefmt" with prompt "{esc_prompt}"'
+    result = subprocess.run(
+        ["osascript", "-e", script],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    choice = result.stdout.strip()
+    if choice == "false":
+        return None
+    return choice
+
+
 _DISPATCHERS: dict[str, Callable[[list[str], str], str | None]] = {
     "rofi": _pick_rofi,
     "wofi": _pick_wofi,
@@ -225,4 +269,5 @@ _DISPATCHERS: dict[str, Callable[[list[str], str], str | None]] = {
     "dmenu": _pick_dmenu,
     "zenity": _pick_zenity,
     "fzf": _pick_fzf,
+    "osascript": _pick_osascript,
 }
