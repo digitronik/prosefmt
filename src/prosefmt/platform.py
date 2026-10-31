@@ -142,3 +142,13 @@ def _detect_linux_pkg_manager() -> str:
         if shutil.which(cmd):
             return cmd
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Shared escaping helpers
+# ---------------------------------------------------------------------------
+
+
+def esc_applescript(s: str) -> str:
+    """Escape a string for interpolation inside AppleScript double quotes."""
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")

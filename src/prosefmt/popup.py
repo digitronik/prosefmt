@@ -19,9 +19,17 @@ Usage::
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+from prosefmt.platform import esc_applescript as _esc
+
+if TYPE_CHECKING:
+    from prosefmt.platform import PlatformInfo
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -69,25 +77,22 @@ def check_popup_tools() -> dict[str, bool]:
     return {t: shutil.which(t) is not None for t in _POPUP_PRIORITY}
 
 
-def install_hints_popup(platform_info: object | None = None) -> list[str]:
+def install_hints_popup(platform_info: PlatformInfo | None = None) -> list[str]:
     """Return human-readable install suggestions for popup tools.
 
-    When *platform_info* (a :class:`~prosefmt.platform.PlatformInfo`) is
-    provided the hints are narrowed to the relevant package manager.
+    When *platform_info* is provided the hints are narrowed to the
+    relevant package manager.
     """
     if best_popup() is not None:
         return []
 
     if platform_info is not None:
-        os_name: str = getattr(platform_info, "os", "")
-        install_cmd = getattr(platform_info, "install_cmd", None)
-
-        if os_name == "macos":
+        if platform_info.os == "macos":
             # osascript should already be detected — shouldn't reach here
             return ["  Install:  brew install zenity  (or: native osascript dialogs)"]
 
-        if os_name == "linux" and install_cmd is not None:
-            cmd = install_cmd("zenity")
+        if platform_info.os == "linux":
+            cmd = platform_info.install_cmd("zenity")
             if cmd:
                 return [f"  Install:  {cmd}"]
 
@@ -157,8 +162,6 @@ def _popup_yad(text: str, title: str) -> bool:
 
 def _popup_kdialog(text: str, title: str) -> bool:
     """kdialog --textbox — KDE native dialog (reads from a temp file)."""
-    import tempfile
-
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
         f.write(text)
         tmpfile = f.name
@@ -171,8 +174,6 @@ def _popup_kdialog(text: str, title: str) -> bool:
             check=False,
         )
     finally:
-        import os
-
         os.unlink(tmpfile)
     return True
 
@@ -228,9 +229,6 @@ def _popup_osascript(text: str, title: str) -> bool:
     copyable text area.  Reads text from a temp file to avoid shell-escaping
     issues with arbitrary content.
     """
-    import os
-    import tempfile
-
     with tempfile.NamedTemporaryFile(
         mode="w",
         suffix=".txt",
@@ -240,11 +238,10 @@ def _popup_osascript(text: str, title: str) -> bool:
         fh.write(text)
         tmppath = fh.name
 
-    esc_title = title.replace("\\", "\\\\").replace('"', '\\"')
     script = (
-        f'set f to POSIX file "{tmppath}"\n'
+        f'set f to POSIX file "{_esc(tmppath)}"\n'
         "set t to read f\n"
-        f'display dialog "" with title "{esc_title}" '
+        f'display dialog "" with title "{_esc(title)}" '
         'default answer t buttons {"OK"} default button "OK"'
     )
     try:
