@@ -15,10 +15,15 @@ class AnthropicProvider:
         url: str = "https://api.anthropic.com",
         model: str = "claude-haiku-4-5-20251001",
         api_key: str = "",
+        *,
+        temperature: float = 0.1,
+        seed: int | None = 42,
     ) -> None:
         self.url = url.rstrip("/")
         self.model = model
         self.api_key = api_key
+        self.temperature = temperature
+        self.seed = seed  # unused — Anthropic has no seed parameter
         self._client = httpx.Client(timeout=120)
 
     @property
@@ -42,6 +47,7 @@ class AnthropicProvider:
                 json={
                     "model": self.model,
                     "max_tokens": 4096,
+                    "temperature": self.temperature,
                     "system": system_prompt,
                     "messages": [{"role": "user", "content": user_prompt}],
                 },

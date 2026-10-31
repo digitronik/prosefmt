@@ -41,6 +41,19 @@ class TestAnthropicProvider:
         assert request.headers["x-api-key"] == "sk-ant-key"
         assert request.headers["anthropic-version"] == "2023-06-01"
 
+    def test_sends_temperature(self, httpx_mock):
+        httpx_mock.add_response(
+            url="https://api.anthropic.com/v1/messages",
+            json={"content": [{"type": "text", "text": "ok"}]},
+        )
+        p = AnthropicProvider(api_key="sk-ant-key", temperature=0.1)
+        p.complete("s", "u")
+
+        import json
+
+        payload = json.loads(httpx_mock.get_request().read())
+        assert payload["temperature"] == 0.1
+
     def test_http_error(self, httpx_mock):
         httpx_mock.add_response(
             url="https://api.anthropic.com/v1/messages",

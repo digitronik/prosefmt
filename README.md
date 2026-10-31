@@ -632,7 +632,7 @@ powerful cloud model for complex rewrites:
 
 ```toml
 [modes.fix]
-prompt   = "Fix grammar, spelling, and punctuation."
+prompt   = "Fix grammar, spelling, and punctuation only. Preserve the original sentence structure, meaning, and tone."
 provider = "ollama"
 model    = "qwen2.5:1.5b"   # fast, local, CPU-friendly
 
@@ -850,6 +850,8 @@ Create it: `prosefmt config init` · View it: `prosefmt config show`
 |:---|:---|:---|:---|
 | `default_mode` | string | `"fix"` | Mode used when `-m` is not specified |
 | `default_provider` | string | `"ollama"` | Provider used when a mode has no `provider` override |
+| `temperature` | float | `0.1` | Sampling temperature — lower = more consistent output |
+| `seed` | int | `42` | Random seed for reproducible results; comment out to disable |
 | `system_prompt` | string | built-in | System instruction prepended to every mode's prompt |
 
 ### Provider fields (`[providers.<name>]`)
@@ -858,6 +860,8 @@ Create it: `prosefmt config init` · View it: `prosefmt config show`
 |:---|:---|
 | `url` | API endpoint URL |
 | `model` | Default model name |
+| `temperature` | Override global temperature for this provider |
+| `seed` | Override global seed for this provider |
 
 > **API keys** are set via environment variables — never put them in `config.toml`.
 
@@ -874,6 +878,7 @@ Create it: `prosefmt config init` · View it: `prosefmt config show`
 | `prompt` | string | required | Instruction sent to the AI |
 | `label` | string | mode name | Display name in notifications and picker |
 | `preserve_structure` | bool | `true` | Re-attach bullet/number list prefixes after rewrite |
+| `temperature` | float | global default | Override sampling temperature for this mode |
 | `provider` | string | global default | Override provider for this mode |
 | `model` | string | provider default | Override model for this mode |
 | `default_output` | string | `"replace"` | Output routing: `"replace"`, `"popup"`, or `"clipboard"` |
@@ -885,6 +890,8 @@ Create it: `prosefmt config init` · View it: `prosefmt config show`
 
 default_mode     = "fix"
 default_provider = "ollama"
+temperature      = 0.1
+seed             = 42
 
 system_prompt = """You are a text rewriter. Output ONLY the rewritten text.
 No preamble, no explanation, no 'Here is'.
@@ -911,38 +918,41 @@ model = "claude-haiku-4-5-20251001"
 # ── Modes ──────────────────────────────────────────────────────
 
 [modes.fix]
-prompt = "Fix grammar, spelling, and punctuation. Keep the same meaning."
+prompt = "Fix grammar, spelling, and punctuation only. Do not add, remove, or rearrange words beyond what is needed. Preserve the original sentence structure, meaning, and tone. Keep the same number of sentences."
 label  = "Grammar fixed"
 
 [modes.professional]
-prompt = "Rewrite in a professional tone for work emails."
+prompt = "Rewrite this text in a professional, formal tone suitable for work emails and business communication. Keep the original meaning."
 label  = "Made professional"
 
 [modes.casual]
-prompt = "Rewrite in a casual, friendly tone."
+prompt = "Rewrite this text in a casual, friendly tone. Keep it natural and conversational. Preserve the original meaning."
 label  = "Made casual"
 
 [modes.rephrase]
-prompt = "Rephrase for better clarity. Keep the same meaning."
-label  = "Rephrased"
+prompt      = "Rephrase this text for better clarity and readability. Use different words while keeping the same meaning."
+label       = "Rephrased"
+temperature = 0.4
 
 [modes.concise]
-prompt = "Make shorter. Remove unnecessary words. Same meaning."
+prompt = "Make this text shorter by removing unnecessary words. Keep the same meaning."
 label  = "Made concise"
 
 [modes.expand]
-prompt = "Expand with more detail and explanation."
-label  = "Expanded"
+prompt      = "Expand this text with more detail and explanation. Keep the same meaning and tone."
+label       = "Expanded"
+temperature = 0.4
 
 [modes.email]
-prompt             = "Rewrite as a professional email with greeting and sign-off."
+prompt             = "Rewrite this as a professional email with an appropriate greeting and sign-off. Keep the core message intact."
 label              = "Formatted as email"
 preserve_structure = false
 
 [modes.summarize]
-prompt             = "Summarize concisely. Key points only. 2-3 sentences."
+prompt             = "Summarize this text in 2-3 sentences. Include only the key points."
 label              = "Summarized"
 preserve_structure = false
+temperature        = 0.4
 default_output     = "popup"
 
 # ── Custom examples (uncomment to enable) ──────────────────────

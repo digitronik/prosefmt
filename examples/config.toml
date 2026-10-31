@@ -6,6 +6,11 @@
 # Default provider (options: ollama, openai, anthropic, openai-compat)
 default_provider = "ollama"
 
+# Sampling — low temperature keeps rewrites consistent (same input → same output).
+# Per-provider override: add temperature / seed under [providers.<name>].
+temperature = 0.1
+seed = 42                    # comment out to let the model pick a random seed
+
 # System prompt applied to every rewrite mode
 # Uncomment to customise:
 # system_prompt = "You are a text editor. Output ONLY the rewritten text..."

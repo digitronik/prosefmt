@@ -15,10 +15,15 @@ class OpenAICompatProvider:
         url: str = "https://api.openai.com/v1",
         model: str = "gpt-4o-mini",
         api_key: str = "",
+        *,
+        temperature: float = 0.1,
+        seed: int | None = 42,
     ) -> None:
         self.url = url.rstrip("/")
         self.model = model
         self.api_key = api_key
+        self.temperature = temperature
+        self.seed = seed
         self._client = httpx.Client(timeout=120)
 
     @property
@@ -31,22 +36,27 @@ class OpenAICompatProvider:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         try:
+            body: dict[str, object] = {
+                "model": self.model,
+                "temperature": self.temperature,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            }
+            if self.seed is not None:
+                body["seed"] = self.seed
+
             resp = self._client.post(
                 f"{self.url}/chat/completions",
                 headers=headers,
-                json={
-                    "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                },
+                json=body,
             )
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
-            body = exc.response.text[:300]
+            err_body = exc.response.text[:300]
             raise ProviderError(
-                f"OpenAI-compatible API returned HTTP {exc.response.status_code}: {body}"
+                f"OpenAI-compatible API returned HTTP {exc.response.status_code}: {err_body}"
             ) from exc
         except httpx.ConnectError as exc:
             raise ProviderError(f"Cannot connect to {self.url}") from exc

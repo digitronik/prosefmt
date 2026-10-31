@@ -39,6 +39,11 @@ class TestConfigDefaults:
         config = Config.load()
         assert len(config.system_prompt) > 50
 
+    def test_default_sampling(self):
+        config = Config.load()
+        assert config.temperature == 0.1
+        assert config.seed == 42
+
 
 class TestConfigFromFile:
     def test_load_custom_provider(self, tmp_path: Path):
@@ -81,6 +86,42 @@ label = "Custom fixed"
         cfg_file.write_text('system_prompt = "Be concise."')
         config = Config.load(cfg_file)
         assert config.system_prompt == "Be concise."
+
+    def test_sampling_from_file(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("temperature = 0.5\nseed = 7\n")
+        config = Config.load(cfg_file)
+        assert config.temperature == 0.5
+        assert config.seed == 7
+
+    def test_provider_sampling_override(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[providers.ollama]
+temperature = 0.2
+seed = 99
+""")
+        config = Config.load(cfg_file)
+        pc = config.providers["ollama"]
+        assert config.effective_temperature(pc) == 0.2
+        assert config.effective_seed(pc) == 99
+
+    def test_mode_temperature_from_file(self, tmp_path: Path):
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("""\
+[modes.fix]
+prompt = "Fix grammar."
+temperature = 0.05
+""")
+        config = Config.load(cfg_file)
+        assert config.modes["fix"].temperature == 0.05
+
+    def test_builtin_mode_temperature_defaults(self, tmp_path: Path):
+        config = Config.load(tmp_path / "nope.toml")
+        assert config.modes["fix"].temperature is None
+        assert config.modes["summarize"].temperature == 0.4
+        assert config.modes["rephrase"].temperature == 0.4
+        assert config.modes["expand"].temperature == 0.4
 
     def test_nonexistent_file_uses_defaults(self, tmp_path: Path):
         config = Config.load(tmp_path / "nope.toml")

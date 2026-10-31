@@ -30,6 +30,34 @@ class TestOllamaProvider:
         result = p.complete("system", "user prompt")
         assert result == "Fixed grammar."
 
+    def test_complete_sends_low_temperature_and_seed(self, httpx_mock):
+        httpx_mock.add_response(
+            url="http://localhost:11434/api/chat",
+            json={"message": {"role": "assistant", "content": "ok"}},
+        )
+        p = OllamaProvider(temperature=0.1, seed=42)
+        p.complete("system", "user")
+
+        request = httpx_mock.get_request()
+        import json
+
+        payload = json.loads(request.read())
+        assert payload["options"]["temperature"] == 0.1
+        assert payload["options"]["seed"] == 42
+
+    def test_complete_omits_seed_when_none(self, httpx_mock):
+        httpx_mock.add_response(
+            url="http://localhost:11434/api/chat",
+            json={"message": {"role": "assistant", "content": "ok"}},
+        )
+        p = OllamaProvider(seed=None)
+        p.complete("system", "user")
+
+        import json
+
+        payload = json.loads(httpx_mock.get_request().read())
+        assert "seed" not in payload["options"]
+
     def test_complete_empty_response(self, httpx_mock):
         httpx_mock.add_response(
             url="http://localhost:11434/api/chat",

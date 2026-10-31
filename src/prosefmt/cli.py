@@ -246,6 +246,10 @@ def _run_rewrite(
     if effective_model:
         pconfig = replace(pconfig, model=effective_model)
 
+    # Temperature: mode config > provider config > global default
+    if mode.temperature is not None:
+        pconfig = replace(pconfig, temperature=mode.temperature)
+
     if show_notify:
         notify(
             "prosefmt",
@@ -254,7 +258,7 @@ def _run_rewrite(
         )
 
     try:
-        prov = get_provider(pname, pconfig)
+        prov = get_provider(pname, pconfig, config)
         result = rewrite(input_text, mode, provider=prov, config=config)
     except (ProviderError, ProsefmtError) as exc:
         if show_notify:
@@ -697,14 +701,20 @@ def config_init() -> None:
 def config_show(ctx: click.Context) -> None:
     """Show the active configuration."""
     config: Config = ctx.obj["config"]
-    click.echo(f"Mode:      {config.default_mode}")
-    click.echo(f"Provider:  {config.default_provider}")
+    click.echo(f"Mode:        {config.default_mode}")
+    click.echo(f"Provider:    {config.default_provider}")
+    click.echo(f"Temperature: {config.temperature}")
+    click.echo(f"Seed:        {config.seed if config.seed is not None else '(none)'}")
 
     pconfig = config.providers.get(config.default_provider)
     if pconfig:
-        click.echo(f"  URL:     {pconfig.url}")
-        click.echo(f"  Model:   {pconfig.model}")
-        click.echo(f"  API Key: {'***' if pconfig.api_key else '(not set)'}")
+        click.echo(f"  URL:         {pconfig.url}")
+        click.echo(f"  Model:       {pconfig.model}")
+        click.echo(f"  API Key:     {'***' if pconfig.api_key else '(not set)'}")
+        if pconfig.temperature is not None:
+            click.echo(f"  Temperature: {pconfig.temperature}  (provider override)")
+        if pconfig.seed is not None:
+            click.echo(f"  Seed:        {pconfig.seed}  (provider override)")
 
     click.echo(f"\nModes ({len(config.modes)}):")
     for name in config.modes:
@@ -763,7 +773,7 @@ def check(ctx: click.Context) -> None:
     pname = config.default_provider
     pconfig = config.providers.get(pname)
     if pconfig:
-        prov = get_provider(pname, pconfig)
+        prov = get_provider(pname, pconfig, config)
         if prov.check_health():
             click.echo(f"✓ Provider '{pname}' is reachable  (model: {pconfig.model})")
         else:
