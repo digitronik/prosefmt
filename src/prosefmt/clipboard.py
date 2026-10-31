@@ -9,6 +9,7 @@ No external Python dependencies — uses platform-native CLI tools:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import platform
 import shutil
@@ -18,6 +19,10 @@ import time
 from collections.abc import Generator
 from contextlib import contextmanager
 from enum import Enum, auto
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prosefmt.platform import PlatformInfo
 
 
 class Platform(Enum):
@@ -229,12 +234,11 @@ def check_clipboard_tools() -> list[str]:
     return missing
 
 
-def install_hints(platform_info: object | None = None) -> list[str]:
+def install_hints(platform_info: PlatformInfo | None = None) -> list[str]:
     """Return human-readable install instructions for missing clipboard tools.
 
-    When *platform_info* (a :class:`~prosefmt.platform.PlatformInfo`) is
-    provided the hints are narrowed to the single relevant package manager.
-    Otherwise a multi-distro fallback is shown.
+    When *platform_info* is provided the hints are narrowed to the single
+    relevant package manager.  Otherwise a multi-distro fallback is shown.
     """
     missing = check_clipboard_tools()
     if not missing:
@@ -263,13 +267,13 @@ def install_hints(platform_info: object | None = None) -> list[str]:
 
 
 def _targeted_hints(
-    platform_info: object | None,
+    platform_info: PlatformInfo | None,
     packages: list[str],
     fallback_names: list[str],
 ) -> list[str]:
     """Format install hints — one-line when platform is known, multi-line otherwise."""
     if platform_info is not None:
-        cmd = platform_info.install_cmd(*packages)  # type: ignore[union-attr]
+        cmd = platform_info.install_cmd(*packages)
         if cmd:
             return [f"  {cmd}"]
     # Fallback: show all common managers
@@ -296,7 +300,5 @@ def _run_stdout(cmd: list[str]) -> str:
 
 
 def _run_stdin(cmd: list[str], text: str) -> None:
-    import contextlib
-
     with contextlib.suppress(FileNotFoundError, subprocess.TimeoutExpired):
         subprocess.run(cmd, input=text, check=False, capture_output=True, text=True, timeout=5)

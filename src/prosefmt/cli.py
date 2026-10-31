@@ -519,7 +519,7 @@ def menu(
 
     # Fail early if no picker tool is installed
     if best_picker() is None:
-        hints = install_hints_picker()
+        hints = install_hints_picker(config.platform)
         click.echo(
             "Error: no picker tool found (need rofi, wofi, fuzzel, dmenu, zenity, or fzf)",
             err=True,
@@ -724,7 +724,19 @@ def config_init() -> None:
 @click.pass_context
 def config_show(ctx: click.Context) -> None:
     """Show the active configuration."""
+    from prosefmt.config import _config_path
+
     config: Config = ctx.obj["config"]
+    cfg_path = _config_path()
+
+    status = "(exists)" if cfg_path.exists() else "(not found — using defaults)"
+    click.echo(f"Config file: {cfg_path}  {status}")
+
+    # Platform
+    pi = config.platform
+    pkg = pi.pkg_manager or "unknown pkg manager"
+    click.echo(f"Platform:    {pi.os}/{pi.display}  ({pi.distro}, {pkg})")
+
     click.echo(f"Mode:        {config.default_mode}")
     click.echo(f"Provider:    {config.default_provider}")
     click.echo(f"Temperature: {config.temperature}")

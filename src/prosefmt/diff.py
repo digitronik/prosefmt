@@ -83,15 +83,17 @@ def format_inline_diff(original: str, result: str, *, color: bool = True) -> str
     if original == result:
         return ""
 
-    sm = difflib.SequenceMatcher(None, original.split(), result.split())
+    orig_words = original.split()
+    result_words = result.split()
+    sm = difflib.SequenceMatcher(None, orig_words, result_words)
     parts: list[str] = []
 
     for op, i1, i2, j1, j2 in sm.get_opcodes():
         if op == "equal":
-            parts.append(" ".join(original.split()[i1:i2]))
+            parts.append(" ".join(orig_words[i1:i2]))
         elif op == "replace":
-            old = " ".join(original.split()[i1:i2])
-            new = " ".join(result.split()[j1:j2])
+            old = " ".join(orig_words[i1:i2])
+            new = " ".join(result_words[j1:j2])
             if color:
                 parts.append(f"\033[31m[-{old}-]\033[0m")
                 parts.append(f"\033[32m{{+{new}+}}\033[0m")
@@ -99,13 +101,13 @@ def format_inline_diff(original: str, result: str, *, color: bool = True) -> str
                 parts.append(f"[-{old}-]")
                 parts.append(f"{{+{new}+}}")
         elif op == "delete":
-            old = " ".join(original.split()[i1:i2])
+            old = " ".join(orig_words[i1:i2])
             if color:
                 parts.append(f"\033[31m[-{old}-]\033[0m")
             else:
                 parts.append(f"[-{old}-]")
         elif op == "insert":
-            new = " ".join(result.split()[j1:j2])
+            new = " ".join(result_words[j1:j2])
             if color:
                 parts.append(f"\033[32m{{+{new}+}}\033[0m")
             else:
