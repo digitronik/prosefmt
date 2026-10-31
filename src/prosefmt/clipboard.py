@@ -229,11 +229,12 @@ def check_clipboard_tools() -> list[str]:
     return missing
 
 
-def install_hints() -> list[str]:
+def install_hints(platform_info: object | None = None) -> list[str]:
     """Return human-readable install instructions for missing clipboard tools.
 
-    Returns an empty list when everything is installed or no tools are needed.
-    Each entry is a ready-to-run shell command the user can copy-paste.
+    When *platform_info* (a :class:`~prosefmt.platform.PlatformInfo`) is
+    provided the hints are narrowed to the single relevant package manager.
+    Otherwise a multi-distro fallback is shown.
     """
     missing = check_clipboard_tools()
     if not missing:
@@ -243,34 +244,42 @@ def install_hints() -> list[str]:
     hints: list[str] = []
 
     if plat == Platform.LINUX_X11:
-        pkg = " ".join(t for t in ("xclip", "xdotool") if not shutil.which(t))
-        if pkg:
-            hints += [
-                f"  # Debian / Ubuntu / Mint:   sudo apt install {pkg}",
-                f"  # Fedora / RHEL / CentOS:   sudo dnf install {pkg}",
-                f"  # Arch / Manjaro:            sudo pacman -S {pkg}",
-                f"  # openSUSE:                  sudo zypper install {pkg}",
-            ]
+        packages = [t for t in ("xclip", "xdotool") if not shutil.which(t)]
+        if packages:
+            hints.extend(_targeted_hints(platform_info, packages, packages))
 
     elif plat == Platform.LINUX_WAYLAND:
-        wl_pkg = " ".join(t for t in ("wl-copy", "wl-paste") if not shutil.which(t))
-        if wl_pkg:
-            hints += [
-                "  # Debian / Ubuntu / Mint:   sudo apt install wl-clipboard",
-                "  # Fedora / RHEL / CentOS:   sudo dnf install wl-clipboard",
-                "  # Arch / Manjaro:            sudo pacman -S wl-clipboard",
-                "  # openSUSE:                  sudo zypper install wl-clipboard",
-            ]
-        if not shutil.which("wtype") and not shutil.which("ydotool"):
-            hints.append("")
-            hints += [
-                "  # For paste-back (--system mode), also install wtype:",
-                "  # Debian / Ubuntu / Mint:   sudo apt install wtype",
-                "  # Fedora / RHEL / CentOS:   sudo dnf install wtype",
-                "  # Arch / Manjaro:            sudo pacman -S wtype",
-            ]
+        wl_missing = any(not shutil.which(t) for t in ("wl-copy", "wl-paste"))
+        paste_missing = not shutil.which("wtype") and not shutil.which("ydotool")
+        packages: list[str] = []
+        if wl_missing:
+            packages.append("wl-clipboard")
+        if paste_missing:
+            packages.append("wtype")
+        if packages:
+            hints.extend(_targeted_hints(platform_info, packages, packages))
 
     return hints
+
+
+def _targeted_hints(
+    platform_info: object | None,
+    packages: list[str],
+    fallback_names: list[str],
+) -> list[str]:
+    """Format install hints — one-line when platform is known, multi-line otherwise."""
+    if platform_info is not None:
+        cmd = platform_info.install_cmd(*packages)  # type: ignore[union-attr]
+        if cmd:
+            return [f"  {cmd}"]
+    # Fallback: show all common managers
+    pkg = " ".join(fallback_names)
+    return [
+        f"  # Debian / Ubuntu / Mint:   sudo apt install {pkg}",
+        f"  # Fedora / RHEL / CentOS:   sudo dnf install {pkg}",
+        f"  # Arch / Manjaro:            sudo pacman -S {pkg}",
+        f"  # openSUSE:                  sudo zypper install {pkg}",
+    ]
 
 
 # ---------------------------------------------------------------------------

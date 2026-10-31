@@ -28,7 +28,8 @@ from collections.abc import Callable
 # ---------------------------------------------------------------------------
 
 # Priority order: first tool found on PATH is used.
-_POPUP_PRIORITY: list[str] = ["zenity", "yad", "kdialog", "rofi", "notify-send"]
+# osascript (macOS native) sits before notify-send — it shows a real dialog.
+_POPUP_PRIORITY: list[str] = ["zenity", "yad", "kdialog", "rofi", "osascript", "notify-send"]
 
 # Max characters for notify-send fallback (no scrolling)
 _NOTIFY_MAX_CHARS = 300
@@ -68,17 +69,36 @@ def check_popup_tools() -> dict[str, bool]:
     return {t: shutil.which(t) is not None for t in _POPUP_PRIORITY}
 
 
-def install_hints_popup() -> list[str]:
-    """Return human-readable install suggestions for popup tools."""
+def install_hints_popup(platform_info: object | None = None) -> list[str]:
+    """Return human-readable install suggestions for popup tools.
+
+    When *platform_info* (a :class:`~prosefmt.platform.PlatformInfo`) is
+    provided the hints are narrowed to the relevant package manager.
+    """
     if best_popup() is not None:
         return []
+
+    if platform_info is not None:
+        os_name: str = getattr(platform_info, "os", "")
+        install_cmd = getattr(platform_info, "install_cmd", None)
+
+        if os_name == "macos":
+            # osascript should already be detected — shouldn't reach here
+            return ["  Install:  brew install zenity  (or: native osascript dialogs)"]
+
+        if os_name == "linux" and install_cmd is not None:
+            cmd = install_cmd("zenity")
+            if cmd:
+                return [f"  Install:  {cmd}"]
+
+    # Fallback — show all common options
     return [
         "  Install at least one popup tool:",
         "  # Fedora / RHEL:  sudo dnf install zenity",
         "  # Ubuntu / Mint:  sudo apt install zenity",
         "  # Arch / Manjaro: sudo pacman -S zenity",
         "  # KDE users:      kdialog is usually pre-installed",
-        "  # Wayland/i3:     rofi can also display popups",
+        "  # macOS:          native osascript (should work out of the box)",
     ]
 
 
@@ -201,10 +221,49 @@ def _popup_notify(text: str, title: str) -> bool:
     return True
 
 
+def _popup_osascript(text: str, title: str) -> bool:
+    """macOS native scrollable text dialog via osascript.
+
+    Uses ``display dialog`` with ``default answer`` to get a scrollable,
+    copyable text area.  Reads text from a temp file to avoid shell-escaping
+    issues with arbitrary content.
+    """
+    import os
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".txt",
+        delete=False,
+        encoding="utf-8",
+    ) as fh:
+        fh.write(text)
+        tmppath = fh.name
+
+    esc_title = title.replace("\\", "\\\\").replace('"', '\\"')
+    script = (
+        f'set f to POSIX file "{tmppath}"\n'
+        "set t to read f\n"
+        f'display dialog "" with title "{esc_title}" '
+        'default answer t buttons {"OK"} default button "OK"'
+    )
+    try:
+        subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        os.unlink(tmppath)
+    return True
+
+
 _DISPATCHERS: dict[str, Callable[[str, str], bool]] = {
     "zenity": _popup_zenity,
     "yad": _popup_yad,
     "kdialog": _popup_kdialog,
     "rofi": _popup_rofi,
+    "osascript": _popup_osascript,
     "notify-send": _popup_notify,
 }

@@ -9,6 +9,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from prosefmt.platform import PlatformInfo
+from prosefmt.platform import detect as _detect_platform
+
 
 def _config_dir() -> Path:
     """XDG-compliant config directory."""
@@ -71,6 +74,7 @@ class Config:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     modes: dict[str, ModeConfig] = field(default_factory=dict)
     undo_file: str = field(default_factory=_default_undo_file)
+    platform: PlatformInfo = field(default_factory=_detect_platform)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Config:
@@ -117,6 +121,9 @@ class Config:
 
     def _apply_toml(self, raw: dict[str, Any]) -> None:
         """Overlay TOML values onto the config."""
+        if "platform" in raw:
+            self.platform = PlatformInfo.from_dict(raw["platform"])
+
         if "default_mode" in raw:
             self.default_mode = raw["default_mode"]
         if "default_provider" in raw:
@@ -214,12 +221,29 @@ def init_config(*, overwrite: bool = False) -> tuple[Path, bool]:
     if path.exists() and not overwrite:
         return path, False
 
+    platform_info = _detect_platform()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(_DEFAULT_CONFIG_CONTENT, encoding="utf-8")
+    path.write_text(_default_config_content(platform_info), encoding="utf-8")
     return path, True
 
 
-_DEFAULT_CONFIG_CONTENT = (
+def _default_config_content(platform_info: PlatformInfo) -> str:
+    """Generate config file content with auto-detected platform values."""
+    platform_section = (
+        "\n"
+        "# ── Platform (auto-detected) ──────────────────────────────────────────────────\n"
+        "# Detected on first run. Override if detection is wrong.\n"
+        "\n"
+        "[platform]\n"
+        f'os          = "{platform_info.os}"\n'
+        f'display     = "{platform_info.display}"\n'
+        f'distro      = "{platform_info.distro}"\n'
+        f'pkg_manager = "{platform_info.pkg_manager}"\n'
+    )
+    return _CONFIG_GENERAL + platform_section + _CONFIG_PROVIDERS_AND_MODES
+
+
+_CONFIG_GENERAL = (
     "# prosefmt configuration\n"
     "# https://github.com/digitronik/prosefmt\n"
     "#\n"
@@ -253,6 +277,9 @@ _DEFAULT_CONFIG_CONTENT = (
     'system_prompt = """You are a text rewriter. Output ONLY the rewritten text.\n'
     "No preamble, no explanation, no 'Here is'.\n"
     'Keep technical terms, code, URLs, and formatting unchanged."""\n'
+)
+
+_CONFIG_PROVIDERS_AND_MODES = (
     "\n"
     "# ── Providers ─────────────────────────────────────────────────────────────────\n"
     "\n"
