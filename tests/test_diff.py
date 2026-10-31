@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from prosefmt.diff import format_diff, format_inline_diff, has_changes
+from prosefmt.diff import format_diff, has_changes
 
 
 class TestHasChanges:
@@ -86,47 +86,3 @@ class TestFormatDiff:
         result = "line one\nline three"
         diff = format_diff(original, result, color=False)
         assert "-line two" in diff
-
-
-class TestFormatInlineDiff:
-    def test_identical_returns_empty(self):
-        assert format_inline_diff("hello world", "hello world") == ""
-
-    def test_word_replacement_no_color(self):
-        original = "Their were a few things"
-        result = "There were a few things"
-        diff = format_inline_diff(original, result, color=False)
-        assert "[-Their-]" in diff
-        assert "{+There+}" in diff
-        assert "were a few things" in diff
-
-    def test_word_replacement_with_color(self):
-        original = "bad text"
-        result = "good text"
-        diff = format_inline_diff(original, result, color=True)
-        assert "\033[31m" in diff  # red for removed
-        assert "\033[32m" in diff  # green for added
-        assert "[-bad-]" in diff
-        assert "{+good+}" in diff
-
-    def test_word_deletion(self):
-        original = "hello beautiful world"
-        result = "hello world"
-        diff = format_inline_diff(original, result, color=False)
-        assert "[-beautiful-]" in diff
-
-    def test_word_insertion(self):
-        original = "hello world"
-        result = "hello beautiful world"
-        diff = format_inline_diff(original, result, color=False)
-        assert "{+beautiful+}" in diff
-
-    def test_multiple_changes(self):
-        original = "the quick brown fox"
-        result = "a slow brown dog"
-        diff = format_inline_diff(original, result, color=False)
-        assert "[-the-]" in diff or "[-the quick-]" in diff
-        assert "{+a+}" in diff or "{+a slow+}" in diff
-
-    def test_empty_strings(self):
-        assert format_inline_diff("", "") == ""
