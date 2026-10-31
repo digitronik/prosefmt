@@ -39,6 +39,8 @@ class ProviderConfig:
     url: str = ""
     model: str = ""
     api_key: str = ""
+    temperature: float | None = None
+    seed: int | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -53,6 +55,7 @@ class ModeConfig:
     # Per-mode overrides — leave None to use the global defaults
     provider: str | None = None  # override config.default_provider
     model: str | None = None  # override provider's default model
+    temperature: float | None = None  # override global/provider temperature
     default_output: str = "replace"  # "replace" | "popup" | "clipboard"
 
 
@@ -62,6 +65,8 @@ class Config:
 
     default_mode: str = "fix"
     default_provider: str = "ollama"
+    temperature: float = 0.1
+    seed: int | None = 42
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     modes: dict[str, ModeConfig] = field(default_factory=dict)
@@ -116,6 +121,11 @@ class Config:
             self.default_mode = raw["default_mode"]
         if "default_provider" in raw:
             self.default_provider = raw["default_provider"]
+        if "temperature" in raw:
+            self.temperature = float(raw["temperature"])
+        if "seed" in raw:
+            val = raw["seed"]
+            self.seed = None if val is None else int(val)
         if "system_prompt" in raw:
             self.system_prompt = raw["system_prompt"]
 
@@ -128,9 +138,18 @@ class Config:
                     pc.model = pdata["model"]
                 if "api_key" in pdata:
                     pc.api_key = pdata["api_key"]
+                if "temperature" in pdata:
+                    pc.temperature = float(pdata["temperature"])
+                if "seed" in pdata:
+                    val = pdata["seed"]
+                    pc.seed = None if val is None else int(val)
             else:
-                known_fields = {"url", "model", "api_key"}
+                known_fields = {"url", "model", "api_key", "temperature", "seed"}
                 filtered = {k: v for k, v in pdata.items() if k in known_fields}
+                if "temperature" in filtered:
+                    filtered["temperature"] = float(filtered["temperature"])
+                if "seed" in filtered and filtered["seed"] is not None:
+                    filtered["seed"] = int(filtered["seed"])
                 self.providers[pname] = ProviderConfig(name=pname, **filtered)
 
         for mname, mdata in raw.get("modes", {}).items():
@@ -142,6 +161,12 @@ class Config:
             else:
                 default_preserve = mname not in _no_preserve
             default_label = existing.label if existing else mname.replace("-", " ").title()
+            raw_temp = mdata.get("temperature")
+            mode_temp = (
+                float(raw_temp)
+                if raw_temp is not None
+                else (existing.temperature if existing else None)
+            )
             self.modes[mname] = ModeConfig(
                 name=mname,
                 prompt=mdata.get("prompt", existing.prompt if existing else ""),
@@ -149,6 +174,7 @@ class Config:
                 preserve_structure=mdata.get("preserve_structure", default_preserve),
                 provider=mdata.get("provider") or None,
                 model=mdata.get("model") or None,
+                temperature=mode_temp,
                 default_output=mdata.get("default_output", "replace"),
             )
 
@@ -166,6 +192,16 @@ class Config:
                     if val:
                         self.providers[pname].api_key = val
                         break
+
+    def effective_temperature(self, provider: ProviderConfig) -> float:
+        if provider.temperature is not None:
+            return provider.temperature
+        return self.temperature
+
+    def effective_seed(self, provider: ProviderConfig) -> int | None:
+        if provider.seed is not None:
+            return provider.seed
+        return self.seed
 
 
 def init_config() -> Path:
@@ -203,6 +239,11 @@ _DEFAULT_CONFIG_CONTENT = (
     "# Default provider (options: ollama, openai, anthropic, openai-compat)\n"
     'default_provider = "ollama"\n'
     "\n"
+    "# Sampling — low temperature keeps rewrites consistent (same input → same output).\n"
+    "# Per-provider override: add temperature / seed under [providers.<name>].\n"
+    "temperature = 0.1\n"
+    "seed = 42                    # comment out to let the model pick a random seed\n"
+    "\n"
     "# System prompt — prepended to every mode's instruction.\n"
     "# Keep it SHORT when using local models (qwen2.5, phi3, gemma).\n"
     'system_prompt = """You are a text rewriter. Output ONLY the rewritten text.\n'
@@ -237,51 +278,58 @@ _DEFAULT_CONFIG_CONTENT = (
     "#   preserve_structure (optional) Keep bullet/number list prefixes. Default: true\n"
     '#   default_output     (optional) "replace" | "popup" | "clipboard". '
     'Default: "replace"\n'
+    "#   temperature        (optional) Override sampling temperature for this mode\n"
     "#   provider           (optional) Override the provider for this mode only\n"
     "#   model              (optional) Override the model for this mode only\n"
     "\n"
     "# ── Text Rewriting ────────────────────────────────────────────────────────────\n"
     "\n"
     "[modes.fix]\n"
-    'prompt = "Fix all grammar, spelling, and punctuation errors. '
-    'Keep the same meaning. Keep the same number of sentences."\n'
+    'prompt = "Fix grammar, spelling, and punctuation only. '
+    "Do not add, remove, or rearrange words beyond what is needed. "
+    "Preserve the original sentence structure, meaning, and tone. "
+    'Keep the same number of sentences."\n'
     'label  = "Grammar fixed"\n'
     "\n"
     "[modes.professional]\n"
-    'prompt = "Rewrite this text in a professional, formal tone. '
-    'Suitable for work emails and business messages."\n'
+    'prompt = "Rewrite this text in a professional, formal tone suitable for '
+    'work emails and business communication. Keep the original meaning."\n'
     'label  = "Made professional"\n'
     "\n"
     "[modes.casual]\n"
     'prompt = "Rewrite this text in a casual, friendly tone. '
-    'Keep it natural and conversational."\n'
+    'Keep it natural and conversational. Preserve the original meaning."\n'
     'label  = "Made casual"\n'
     "\n"
     "[modes.rephrase]\n"
-    'prompt = "Rephrase this text for better clarity. Keep the same meaning. '
-    'Use different words."\n'
-    'label  = "Rephrased"\n'
+    'prompt      = "Rephrase this text for better clarity and readability. '
+    'Use different words while keeping the same meaning."\n'
+    'label       = "Rephrased"\n'
+    "temperature = 0.4\n"
     "\n"
     "[modes.concise]\n"
-    'prompt = "Make this text shorter. Remove unnecessary words. Keep the same meaning."\n'
+    'prompt = "Make this text shorter by removing unnecessary words. '
+    'Keep the same meaning."\n'
     'label  = "Made concise"\n'
     "\n"
     "[modes.expand]\n"
-    'prompt = "Expand this text with more detail and explanation. '
+    'prompt      = "Expand this text with more detail and explanation. '
     'Keep the same meaning and tone."\n'
-    'label  = "Expanded"\n'
+    'label       = "Expanded"\n'
+    "temperature = 0.4\n"
     "\n"
     "[modes.email]\n"
-    'prompt             = "Rewrite this as a professional email. '
-    'Add a greeting at the start and a sign-off at the end."\n'
+    'prompt             = "Rewrite this as a professional email with an appropriate '
+    'greeting and sign-off. Keep the core message intact."\n'
     'label              = "Formatted as email"\n'
     "preserve_structure = false\n"
     "\n"
     "[modes.summarize]\n"
-    'prompt             = "Write a short summary of this text. Include only the key points. '
-    'Use 2-3 sentences maximum."\n'
+    'prompt             = "Summarize this text in 2-3 sentences. '
+    'Include only the key points."\n'
     'label              = "Summarized"\n'
     "preserve_structure = false\n"
+    "temperature        = 0.4\n"
     'default_output     = "popup"\n'
     "\n"
     "# ── Translation ───────────────────────────────────────────────────────────────\n"

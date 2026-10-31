@@ -10,9 +10,18 @@ from prosefmt.providers.base import ProviderError
 class OllamaProvider:
     """Local Ollama LLM provider (no API key needed)."""
 
-    def __init__(self, url: str = "http://localhost:11434", model: str = "qwen2.5:1.5b") -> None:
+    def __init__(
+        self,
+        url: str = "http://localhost:11434",
+        model: str = "qwen2.5:1.5b",
+        *,
+        temperature: float = 0.1,
+        seed: int | None = 42,
+    ) -> None:
         self.url = url.rstrip("/")
         self.model = model
+        self.temperature = temperature
+        self.seed = seed
         self._client = httpx.Client(timeout=120)
 
     @property
@@ -20,6 +29,10 @@ class OllamaProvider:
         return "ollama"
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
+        options: dict[str, float | int] = {"temperature": self.temperature}
+        if self.seed is not None:
+            options["seed"] = self.seed
+
         try:
             resp = self._client.post(
                 f"{self.url}/api/chat",
@@ -30,6 +43,7 @@ class OllamaProvider:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    "options": options,
                 },
             )
             resp.raise_for_status()

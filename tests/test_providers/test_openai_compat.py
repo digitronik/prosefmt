@@ -35,6 +35,20 @@ class TestOpenAICompatProvider:
         request = httpx_mock.get_request()
         assert request.headers["authorization"] == "Bearer sk-test-key"
 
+    def test_sends_temperature_and_seed(self, httpx_mock):
+        httpx_mock.add_response(
+            url="https://api.openai.com/v1/chat/completions",
+            json={"choices": [{"message": {"content": "ok"}}]},
+        )
+        p = OpenAICompatProvider(api_key="sk-test", temperature=0.1, seed=42)
+        p.complete("s", "u")
+
+        import json
+
+        payload = json.loads(httpx_mock.get_request().read())
+        assert payload["temperature"] == 0.1
+        assert payload["seed"] == 42
+
     def test_no_auth_header_without_key(self, httpx_mock):
         httpx_mock.add_response(
             url="https://api.openai.com/v1/chat/completions",

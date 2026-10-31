@@ -8,8 +8,10 @@ BUILTIN_MODES: dict[str, dict] = {
     "fix": {
         "name": "fix",
         "prompt": (
-            "Fix all grammar, spelling, and punctuation errors. "
-            "Keep the same meaning. Keep the same number of sentences."
+            "Fix grammar, spelling, and punctuation only. "
+            "Do not add, remove, or rearrange words beyond what is needed. "
+            "Preserve the original sentence structure, meaning, and tone. "
+            "Keep the same number of sentences."
         ),
         "label": "Grammar fixed",
         "preserve_structure": True,
@@ -17,8 +19,8 @@ BUILTIN_MODES: dict[str, dict] = {
     "professional": {
         "name": "professional",
         "prompt": (
-            "Rewrite this text in a professional, formal tone. "
-            "Suitable for work emails and business messages."
+            "Rewrite this text in a professional, formal tone suitable for "
+            "work emails and business communication. Keep the original meaning."
         ),
         "label": "Made professional",
         "preserve_structure": True,
@@ -26,7 +28,8 @@ BUILTIN_MODES: dict[str, dict] = {
     "casual": {
         "name": "casual",
         "prompt": (
-            "Rewrite this text in a casual, friendly tone. Keep it natural and conversational."
+            "Rewrite this text in a casual, friendly tone. "
+            "Keep it natural and conversational. Preserve the original meaning."
         ),
         "label": "Made casual",
         "preserve_structure": True,
@@ -34,32 +37,32 @@ BUILTIN_MODES: dict[str, dict] = {
     "rephrase": {
         "name": "rephrase",
         "prompt": (
-            "Rephrase this text for better clarity. Keep the same meaning. Use different words."
+            "Rephrase this text for better clarity and readability. "
+            "Use different words while keeping the same meaning."
         ),
         "label": "Rephrased",
         "preserve_structure": True,
+        "temperature": 0.4,
     },
     "summarize": {
         "name": "summarize",
-        "prompt": (
-            "Write a short summary of this text. Include only the key points. "
-            "Use 2-3 sentences maximum."
-        ),
+        "prompt": ("Summarize this text in 2-3 sentences. Include only the key points."),
         "label": "Summarized",
         "preserve_structure": False,
+        "temperature": 0.4,
     },
     "email": {
         "name": "email",
         "prompt": (
-            "Rewrite this as a professional email. "
-            "Add a greeting at the start and a sign-off at the end."
+            "Rewrite this as a professional email with an appropriate "
+            "greeting and sign-off. Keep the core message intact."
         ),
         "label": "Formatted as email",
         "preserve_structure": False,
     },
     "concise": {
         "name": "concise",
-        "prompt": ("Make this text shorter. Remove unnecessary words. Keep the same meaning."),
+        "prompt": ("Make this text shorter by removing unnecessary words. Keep the same meaning."),
         "label": "Made concise",
         "preserve_structure": True,
     },
@@ -70,6 +73,7 @@ BUILTIN_MODES: dict[str, dict] = {
         ),
         "label": "Expanded",
         "preserve_structure": True,
+        "temperature": 0.4,
     },
 }
 
