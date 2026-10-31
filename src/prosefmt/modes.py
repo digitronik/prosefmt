@@ -1,84 +1,19 @@
-"""Built-in rewrite modes and list-structure preservation logic."""
+"""List-structure preservation logic for rewrite modes.
+
+Bullets and numbered lists are stripped before sending text to the AI
+(so the model never loses or mangles them), then re-attached to the result.
+
+All mode definitions — prompts, labels, defaults — live in
+``default_config.toml`` (the single source of truth).  Python code
+never hardcodes prompt text.
+"""
 
 from __future__ import annotations
 
 import re
 
-BUILTIN_MODES: dict[str, dict] = {
-    "fix": {
-        "name": "fix",
-        "prompt": (
-            "Fix grammar, spelling, and punctuation only. "
-            "Do not add, remove, or rearrange words beyond what is needed. "
-            "Preserve the original sentence structure, meaning, and tone. "
-            "Keep the same number of sentences."
-        ),
-        "label": "Grammar fixed",
-        "preserve_structure": True,
-    },
-    "professional": {
-        "name": "professional",
-        "prompt": (
-            "Rewrite this text in a professional, formal tone suitable for "
-            "work emails and business communication. Keep the original meaning."
-        ),
-        "label": "Made professional",
-        "preserve_structure": True,
-    },
-    "casual": {
-        "name": "casual",
-        "prompt": (
-            "Rewrite this text in a casual, friendly tone. "
-            "Keep it natural and conversational. Preserve the original meaning."
-        ),
-        "label": "Made casual",
-        "preserve_structure": True,
-    },
-    "rephrase": {
-        "name": "rephrase",
-        "prompt": (
-            "Rephrase this text for better clarity and readability. "
-            "Use different words while keeping the same meaning."
-        ),
-        "label": "Rephrased",
-        "preserve_structure": True,
-        "temperature": 0.4,
-    },
-    "summarize": {
-        "name": "summarize",
-        "prompt": ("Summarize this text in 2-3 sentences. Include only the key points."),
-        "label": "Summarized",
-        "preserve_structure": False,
-        "temperature": 0.4,
-    },
-    "email": {
-        "name": "email",
-        "prompt": (
-            "Rewrite this as a professional email with an appropriate "
-            "greeting and sign-off. Keep the core message intact."
-        ),
-        "label": "Formatted as email",
-        "preserve_structure": False,
-    },
-    "concise": {
-        "name": "concise",
-        "prompt": ("Make this text shorter by removing unnecessary words. Keep the same meaning."),
-        "label": "Made concise",
-        "preserve_structure": True,
-    },
-    "expand": {
-        "name": "expand",
-        "prompt": (
-            "Expand this text with more detail and explanation. Keep the same meaning and tone."
-        ),
-        "label": "Expanded",
-        "preserve_structure": True,
-        "temperature": 0.4,
-    },
-}
-
-_BULLET_RE = re.compile(r"^(\s*[-*\u2022+\u00b7]\s+)(.*)")
-_NUMBER_RE = re.compile(r"^(\s*\d+\.\s+)(.*)")
+_BULLET_RE = re.compile(r"^(\s*[-*\u2022+\u00b7]\s+)(.*)", re.MULTILINE)
+_NUMBER_RE = re.compile(r"^(\s*\d+[\.\)]\s+)(.*)", re.MULTILINE)
 
 
 def strip_list_prefixes(text: str) -> tuple[list[str], str]:

@@ -1,0 +1,172 @@
+# prosefmt configuration
+# https://github.com/digitronik/prosefmt
+#
+# This file is the single source of truth for all modes and prompts.
+# Edit any prompt to fit your model, language, and writing style.
+# The picker menu updates automatically whenever you add or remove a mode.
+#
+# ── Prompt tips for small local models (1.5B-3B) ─────────────────────────────
+#   • Keep system_prompt SHORT (1-2 sentences). Long prompts confuse SLMs.
+#   • Use simple, direct instructions. Avoid double negations.
+#   • Use short sentences with one instruction each.
+#   • Translation to non-Latin scripts (Hindi, Chinese, Arabic, …) needs
+#     a larger model (≥7B). Use the per-mode "model" field to override.
+
+# ── General ───────────────────────────────────────────────────────────────────
+
+# Default mode — used when you run `prosefmt "text"` without --mode.
+# Change to any mode name defined below (e.g. "professional", "translate-czech").
+default_mode = "fix"
+
+# Default provider (options: ollama, openai, anthropic, openai-compat)
+default_provider = "ollama"
+
+# Sampling — low temperature keeps rewrites consistent (same input → same output).
+# Per-provider override: add temperature / seed under [providers.<name>].
+temperature = 0.1
+seed = 42                    # comment out to let the model pick a random seed
+
+# System prompt — prepended to every mode's instruction.
+# Keep it SHORT when using local models (qwen2.5, phi3, gemma).
+system_prompt = """You are a text rewriter. Output ONLY the rewritten text.
+No preamble, no explanation, no 'Here is'.
+Keep technical terms, code, URLs, and formatting unchanged."""
+
+{{PLATFORM}}
+
+# ── Providers ─────────────────────────────────────────────────────────────────
+
+[providers.ollama]
+url   = "http://localhost:11434"
+model = "qwen2.5:1.5b"          # change to any model you have pulled
+
+[providers.openai]
+url   = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
+# API key: set PROSEFMT_OPENAI_API_KEY or OPENAI_API_KEY env var
+
+[providers.anthropic]
+url   = "https://api.anthropic.com"
+model = "claude-haiku-4-5-20251001"
+# API key: set PROSEFMT_ANTHROPIC_API_KEY or ANTHROPIC_API_KEY env var
+
+# Any OpenAI-compatible endpoint (Groq, Together AI, LM Studio, vLLM, etc.)
+# [providers.openai-compat]
+# url   = "https://api.groq.com/openai/v1"
+# model = "llama-3.3-70b-versatile"
+# API key: set PROSEFMT_COMPAT_API_KEY env var
+
+# ── Modes ─────────────────────────────────────────────────────────────────────
+#
+# Fields:
+#   prompt             (required) Instruction sent to the AI
+#   label              (optional) Name shown in notifications. Default: mode name
+#   preserve_structure (optional) Keep bullet/number list prefixes. Default: true
+#   default_output     (optional) "replace" | "popup" | "clipboard". Default: "replace"
+#   temperature        (optional) Override sampling temperature for this mode
+#   provider           (optional) Override the provider for this mode only
+#   model              (optional) Override the model for this mode only
+
+# ── Text Rewriting ────────────────────────────────────────────────────────────
+
+[modes.fix]
+prompt = "Fix grammar, spelling, and punctuation only. Do not add, remove, or rearrange words beyond what is needed. Preserve the original sentence structure, meaning, and tone. Keep the same number of sentences."
+label  = "Grammar fixed"
+
+[modes.professional]
+prompt = "Rewrite this text in a professional, formal tone suitable for work emails and business communication. Keep the original meaning."
+label  = "Made professional"
+
+[modes.casual]
+prompt = "Rewrite this text in a casual, friendly tone. Keep it natural and conversational. Preserve the original meaning."
+label  = "Made casual"
+
+[modes.rephrase]
+prompt      = "Rephrase this text for better clarity and readability. Use different words while keeping the same meaning."
+label       = "Rephrased"
+temperature = 0.4
+
+[modes.concise]
+prompt = "Make this text shorter by removing unnecessary words. Keep the same meaning."
+label  = "Made concise"
+
+[modes.expand]
+prompt      = "Expand this text with more detail and explanation. Keep the same meaning and tone."
+label       = "Expanded"
+temperature = 0.4
+
+[modes.email]
+prompt             = "Rewrite this as a professional email with an appropriate greeting and sign-off. Keep the core message intact."
+label              = "Formatted as email"
+preserve_structure = false
+
+[modes.summarize]
+prompt             = "Summarize this text in 2-3 sentences. Include only the key points."
+label              = "Summarized"
+preserve_structure = false
+temperature        = 0.4
+default_output     = "popup"
+
+# ── Translation ───────────────────────────────────────────────────────────────
+# Remove the '#' characters to enable a language. Add more as you need them.
+#
+# IMPORTANT: Translation (especially to non-Latin scripts like Hindi, Chinese,
+# Arabic) needs a larger model. Small models (1.5B-3B) will produce garbage.
+# Use "model" to override per mode — e.g. model = "qwen2.5:7b"
+# Or route to a cloud provider — e.g. provider = "openai"
+#
+# Workflow tip — translate an incoming message without replacing it:
+#   set default_output = "popup" so the translation appears in a popup
+#   and the original text is left untouched.
+
+# [modes.translate-english]
+# prompt         = "Translate the following text to English. Output only the translation."
+# label          = "Translated to English"
+# default_output = "popup"
+# model          = "qwen2.5:7b"   # translation needs a larger model
+
+# [modes.translate-czech]
+# prompt = "Translate the following text to Czech. Keep technical terms in English. Output only the translation."
+# label  = "Přeloženo do češtiny"
+# model  = "qwen2.5:7b"
+
+# [modes.translate-hindi]
+# prompt = "Translate the following text to Hindi (Devanagari script). Keep technical terms in English. Output only the Hindi translation."
+# label  = "हिंदी में अनुवादित"
+# model  = "qwen2.5:7b"   # Hindi needs ≥7B model for coherent output
+
+# [modes.translate-french]
+# prompt = "Translate the following text to French. Keep technical terms in English. Output only the translation."
+# label  = "Traduit en français"
+# model  = "qwen2.5:7b"
+
+# [modes.translate-spanish]
+# prompt = "Translate the following text to Spanish. Keep technical terms in English. Output only the translation."
+# label  = "Traducido al español"
+# model  = "qwen2.5:7b"
+
+# ── Analysis ──────────────────────────────────────────────────────────────────
+# These modes show a popup by default (don't replace the original text).
+
+# [modes.explain]
+# prompt         = "Explain this text in simple terms. Be brief. Use 2-3 sentences."
+# label          = "Explained"
+# default_output = "popup"
+
+# [modes.review]
+# prompt         = "Review this text. List issues with grammar, clarity, or tone. Be specific."
+# label          = "Reviewed"
+# default_output = "popup"
+# provider       = "openai"   # heavier task — uncomment to use a cloud model
+
+# ── Code ──────────────────────────────────────────────────────────────────────
+
+# [modes.add-comments]
+# prompt             = "Add clear, concise comments to this code. Do not change any code."
+# label              = "Comments added"
+# preserve_structure = false
+
+# [modes.commit-message]
+# prompt         = "Write a concise git commit message for this diff. Use conventional commits format."
+# label          = "Commit message"
+# default_output = "popup"
