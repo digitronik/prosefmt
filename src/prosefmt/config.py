@@ -204,15 +204,19 @@ class Config:
         return self.seed
 
 
-def init_config() -> Path:
-    """Create a default config file if it doesn't exist. Returns the path."""
+def init_config(*, overwrite: bool = False) -> tuple[Path, bool]:
+    """Create a default config file.
+
+    Returns ``(path, created)`` where *created* is ``True`` when a new file
+    was written and ``False`` when an existing file was left untouched.
+    """
     path = _config_path()
-    if path.exists():
-        return path
+    if path.exists() and not overwrite:
+        return path, False
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_DEFAULT_CONFIG_CONTENT, encoding="utf-8")
-    return path
+    return path, True
 
 
 _DEFAULT_CONFIG_CONTENT = (

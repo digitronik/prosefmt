@@ -674,8 +674,19 @@ def config_init() -> None:
     from prosefmt.clipboard import check_clipboard_tools, install_hints
     from prosefmt.config import init_config
 
-    path = init_config()
-    click.echo(f"✓ Config file ready: {path}")
+    path, created = init_config()
+
+    if not created:
+        # File already exists — ask before overwriting.
+        click.echo(f"⚠  Config file already exists: {path}")
+        if click.confirm("  Overwrite with defaults?", default=False):
+            path, created = init_config(overwrite=True)
+            click.echo(f"✓ Config file restored to defaults: {path}")
+        else:
+            click.echo("  Keeping existing config file.")
+    else:
+        click.echo(f"✓ Config file created: {path}")
+
     click.echo("  Edit it to set your provider, model, and custom modes.\n")
 
     missing = check_clipboard_tools()

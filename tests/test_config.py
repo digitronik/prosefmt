@@ -228,14 +228,25 @@ url = "http://localhost:1234/v1"
 class TestInitConfig:
     def test_creates_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-        path = init_config()
+        path, created = init_config()
+        assert created
         assert path.exists()
         assert "prosefmt" in path.read_text(encoding="utf-8").lower()
 
     def test_does_not_overwrite(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-        path = init_config()
-        path.read_text(encoding="utf-8")
+        path, _ = init_config()
         path.write_text("custom content", encoding="utf-8")
-        init_config()
+        path2, created = init_config()
+        assert not created
+        assert path2 == path
         assert path.read_text(encoding="utf-8") == "custom content"
+
+    def test_overwrite_restores_defaults(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        path, _ = init_config()
+        path.write_text("custom content", encoding="utf-8")
+        path2, created = init_config(overwrite=True)
+        assert created
+        assert path2 == path
+        assert "prosefmt" in path.read_text(encoding="utf-8").lower()
