@@ -16,6 +16,7 @@ repos:
       - id: check-yaml
         args: [--unsafe] # GitHub Actions uses custom YAML tags
       - id: check-toml
+        exclude: ^src/prosefmt/default_config\.toml$
       - id: check-added-large-files
         args: [--maxkb=512]
       - id: detect-private-key

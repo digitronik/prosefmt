@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import mock_open, patch
 
-from prosefmt.platform import PlatformInfo, detect
+from prosefmt.platform import Platform, PlatformInfo, detect, detect_platform
 
 
 def _which(binary: str):
@@ -121,6 +121,85 @@ class TestDetect:
             pi = detect()
         assert pi.distro == ""
         assert pi.pkg_manager == ""
+
+
+class TestDetectPlatformEnum:
+    """Tests for the unified Platform enum detection."""
+
+    def test_wayland_display_env_wins(self, monkeypatch):
+        """WAYLAND_DISPLAY should be checked even if XDG_SESSION_TYPE is unset."""
+        monkeypatch.delenv("XDG_SESSION_TYPE", raising=False)
+        monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+        with patch("prosefmt.platform.platform.system", return_value="Linux"):
+            assert detect_platform() == Platform.LINUX_WAYLAND
+
+    def test_xdg_session_type_fallback(self, monkeypatch):
+        monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+        monkeypatch.setenv("XDG_SESSION_TYPE", "wayland")
+        with patch("prosefmt.platform.platform.system", return_value="Linux"):
+            assert detect_platform() == Platform.LINUX_WAYLAND
+
+    def test_defaults_to_x11(self, monkeypatch):
+        monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+        monkeypatch.delenv("XDG_SESSION_TYPE", raising=False)
+        with patch("prosefmt.platform.platform.system", return_value="Linux"):
+            assert detect_platform() == Platform.LINUX_X11
+
+    def test_macos(self):
+        with patch("prosefmt.platform.platform.system", return_value="Darwin"):
+            assert detect_platform() == Platform.MACOS
+
+    def test_windows(self):
+        with patch("prosefmt.platform.platform.system", return_value="Windows"):
+            assert detect_platform() == Platform.WINDOWS
+
+
+class TestLinuxDisplayConsistency:
+    """Verify detect() and detect_platform() always agree on display server."""
+
+    def test_wayland_display_env_both_agree(self, monkeypatch):
+        """Both functions should detect Wayland when WAYLAND_DISPLAY is set."""
+        monkeypatch.delenv("XDG_SESSION_TYPE", raising=False)
+        monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+        os_release = "ID=fedora\n"
+        with (
+            patch("prosefmt.platform.platform.system", return_value="Linux"),
+            patch("builtins.open", mock_open(read_data=os_release)),
+            patch("prosefmt.platform.shutil.which", side_effect=_which("dnf")),
+        ):
+            pi = detect()
+            plat = detect_platform()
+        assert pi.display == "wayland"
+        assert plat == Platform.LINUX_WAYLAND
+
+    def test_xdg_wayland_both_agree(self, monkeypatch):
+        """Both functions should detect Wayland from XDG_SESSION_TYPE alone."""
+        monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+        monkeypatch.setenv("XDG_SESSION_TYPE", "wayland")
+        os_release = "ID=fedora\n"
+        with (
+            patch("prosefmt.platform.platform.system", return_value="Linux"),
+            patch("builtins.open", mock_open(read_data=os_release)),
+            patch("prosefmt.platform.shutil.which", side_effect=_which("dnf")),
+        ):
+            pi = detect()
+            plat = detect_platform()
+        assert pi.display == "wayland"
+        assert plat == Platform.LINUX_WAYLAND
+
+    def test_neither_set_both_x11(self, monkeypatch):
+        monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+        monkeypatch.delenv("XDG_SESSION_TYPE", raising=False)
+        os_release = "ID=fedora\n"
+        with (
+            patch("prosefmt.platform.platform.system", return_value="Linux"),
+            patch("builtins.open", mock_open(read_data=os_release)),
+            patch("prosefmt.platform.shutil.which", side_effect=_which("dnf")),
+        ):
+            pi = detect()
+            plat = detect_platform()
+        assert pi.display == "x11"
+        assert plat == Platform.LINUX_X11
 
 
 class TestPlatformInfoInstallCmd:

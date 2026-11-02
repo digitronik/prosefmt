@@ -77,3 +77,20 @@ class TestAnthropicProvider:
         p = AnthropicProvider(api_key="sk-ant-test")
         with pytest.raises(ProviderError, match="timed out"):
             p.complete("s", "u")
+
+    def test_complete_connect_error(self, httpx_mock):
+        import httpx
+
+        httpx_mock.add_exception(httpx.ConnectError("refused"))
+        p = AnthropicProvider(api_key="sk-ant-test")
+        with pytest.raises(ProviderError, match="Cannot connect"):
+            p.complete("s", "u")
+
+    def test_malformed_response(self, httpx_mock):
+        httpx_mock.add_response(
+            url="https://api.anthropic.com/v1/messages",
+            json={"error": {"message": "Something broke"}},
+        )
+        p = AnthropicProvider(api_key="sk-ant-test")
+        with pytest.raises(ProviderError, match="Something broke"):
+            p.complete("s", "u")

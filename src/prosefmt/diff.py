@@ -1,7 +1,7 @@
 """Text diff formatting — show what changed between original and result.
 
-Produces human-readable unified or inline diffs suitable for terminal output
-or popup display. This is a unique differentiator — no competitor shows diffs.
+Produces a human-readable unified diff suitable for terminal output or
+popup display.
 
 Usage::
 
@@ -64,56 +64,6 @@ def format_diff(
         diff_lines = [_colorize_line(line) for line in diff_lines]
 
     return "".join(diff_lines)
-
-
-def format_inline_diff(original: str, result: str, *, color: bool = True) -> str:
-    """Produce a word-level inline diff — compact, single-block view.
-
-    Shows removed words in red and added words in green on the same line.
-    Good for short texts where unified diff is overkill.
-
-    Args:
-        original: The text before rewriting.
-        result: The text after rewriting.
-        color: Whether to add ANSI colour codes.
-
-    Returns:
-        A formatted inline diff string. Empty string if texts are identical.
-    """
-    if original == result:
-        return ""
-
-    orig_words = original.split()
-    result_words = result.split()
-    sm = difflib.SequenceMatcher(None, orig_words, result_words)
-    parts: list[str] = []
-
-    for op, i1, i2, j1, j2 in sm.get_opcodes():
-        if op == "equal":
-            parts.append(" ".join(orig_words[i1:i2]))
-        elif op == "replace":
-            old = " ".join(orig_words[i1:i2])
-            new = " ".join(result_words[j1:j2])
-            if color:
-                parts.append(f"\033[31m[-{old}-]\033[0m")
-                parts.append(f"\033[32m{{+{new}+}}\033[0m")
-            else:
-                parts.append(f"[-{old}-]")
-                parts.append(f"{{+{new}+}}")
-        elif op == "delete":
-            old = " ".join(orig_words[i1:i2])
-            if color:
-                parts.append(f"\033[31m[-{old}-]\033[0m")
-            else:
-                parts.append(f"[-{old}-]")
-        elif op == "insert":
-            new = " ".join(result_words[j1:j2])
-            if color:
-                parts.append(f"\033[32m{{+{new}+}}\033[0m")
-            else:
-                parts.append(f"{{+{new}+}}")
-
-    return " ".join(parts)
 
 
 def has_changes(original: str, result: str) -> bool:

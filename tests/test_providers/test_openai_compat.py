@@ -95,3 +95,50 @@ class TestOpenAICompatProvider:
         p = OpenAICompatProvider(api_key="sk-test")
         with pytest.raises(ProviderError, match="timed out"):
             p.complete("s", "u")
+
+    def test_complete_connect_error(self, httpx_mock):
+        import httpx
+
+        httpx_mock.add_exception(httpx.ConnectError("refused"))
+        p = OpenAICompatProvider(url="http://localhost:9999/v1", api_key="sk-test")
+        with pytest.raises(ProviderError, match="Cannot connect"):
+            p.complete("s", "u")
+
+    def test_health_check_success(self, httpx_mock):
+        httpx_mock.add_response(
+            url="https://api.openai.com/v1/models",
+            json={"data": []},
+        )
+        p = OpenAICompatProvider(api_key="sk-test")
+        assert p.check_health() is True
+
+    def test_health_check_failure(self, httpx_mock):
+        httpx_mock.add_response(
+            url="https://api.openai.com/v1/models",
+            status_code=401,
+        )
+        p = OpenAICompatProvider(api_key="sk-test")
+        assert p.check_health() is False
+
+    def test_health_check_connection_error(self, httpx_mock):
+        import httpx
+
+        httpx_mock.add_exception(
+            httpx.ConnectError("refused"),
+            url="https://api.openai.com/v1/models",
+        )
+        p = OpenAICompatProvider(api_key="sk-test")
+        assert p.check_health() is False
+
+    def test_seed_omitted_when_none(self, httpx_mock):
+        httpx_mock.add_response(
+            url="https://api.openai.com/v1/chat/completions",
+            json={"choices": [{"message": {"content": "ok"}}]},
+        )
+        p = OpenAICompatProvider(api_key="sk-test", seed=None)
+        p.complete("s", "u")
+
+        import json
+
+        payload = json.loads(httpx_mock.get_request().read())
+        assert "seed" not in payload

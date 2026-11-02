@@ -108,3 +108,11 @@ class TestOllamaProvider:
         p = OllamaProvider()
         with pytest.raises(ProviderError, match="timed out"):
             p.complete("system", "user prompt")
+
+    def test_complete_connect_error(self, httpx_mock):
+        import httpx
+
+        httpx_mock.add_exception(httpx.ConnectError("refused"))
+        p = OllamaProvider()
+        with pytest.raises(ProviderError, match="Cannot connect"):
+            p.complete("system", "user prompt")
