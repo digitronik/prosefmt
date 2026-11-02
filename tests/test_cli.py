@@ -119,7 +119,10 @@ class TestRewriteDefault:
         assert result.exit_code != 0
 
     def test_no_text_with_mode_shows_error(self, runner):
-        with patch("prosefmt.clipboard.clipboard_read", return_value=""):
+        with (
+            patch("prosefmt.clipboard.clipboard_read", return_value=""),
+            patch("prosefmt.clipboard.capture_selection", return_value=""),
+        ):
             result = runner.invoke(cli, ["-m", "fix", "-s"])
         assert result.exit_code != 0
         assert "no text" in result.output.lower()
@@ -301,6 +304,7 @@ default_output = "popup"
         with (
             patch("prosefmt.providers.get_provider") as mock_gp,
             patch("prosefmt.clipboard.clipboard_read", return_value="some long text"),
+            patch("prosefmt.clipboard.capture_selection", return_value="some long text"),
             patch("prosefmt.popup.show_popup", return_value=True) as mock_popup,
         ):
             mock_gp.return_value.complete.return_value = "Summary."
@@ -356,6 +360,7 @@ class TestDiffOutput:
         with (
             patch("prosefmt.providers.get_provider") as mock_gp,
             patch("prosefmt.clipboard.clipboard_read", return_value="bad grammer"),
+            patch("prosefmt.clipboard.capture_selection", return_value="bad grammer"),
         ):
             mock_gp.return_value.complete.return_value = "bad grammar"
             result = runner.invoke(cli, ["--diff", "-s"])
@@ -429,6 +434,47 @@ model = "llama-3.3-70b-versatile"
             assert result.exit_code == 0
             # Provider name is "groq" but type-based dispatch should work
             assert mock_gp.call_args[0][0] == "groq"
+
+
+class TestResolveInputSystem:
+    """--system reads the highlight without disturbing Linux primary selection."""
+
+    def test_linux_reads_primary_selection(self):
+        from prosefmt.cli import _resolve_input
+        from prosefmt.platform import Platform
+
+        with (
+            patch("prosefmt.platform.detect_platform", return_value=Platform.LINUX_X11),
+            patch("prosefmt.clipboard.clipboard_read", return_value="highlighted") as read,
+            patch("prosefmt.clipboard.capture_selection") as capture,
+        ):
+            assert _resolve_input(None, False, True) == "highlighted"
+            read.assert_called_once_with(selection="auto")
+            capture.assert_not_called()
+
+    def test_macos_copies_the_highlight(self):
+        from prosefmt.cli import _resolve_input
+        from prosefmt.platform import Platform
+
+        with (
+            patch("prosefmt.platform.detect_platform", return_value=Platform.MACOS),
+            patch("prosefmt.clipboard.clipboard_read") as read,
+            patch("prosefmt.clipboard.capture_selection", return_value="highlighted") as capture,
+        ):
+            assert _resolve_input(None, False, True) == "highlighted"
+            capture.assert_called_once_with()
+            read.assert_not_called()
+
+    def test_windows_copies_the_highlight(self):
+        from prosefmt.cli import _resolve_input
+        from prosefmt.platform import Platform
+
+        with (
+            patch("prosefmt.platform.detect_platform", return_value=Platform.WINDOWS),
+            patch("prosefmt.clipboard.capture_selection", return_value="highlighted") as capture,
+        ):
+            assert _resolve_input(None, False, True) == "highlighted"
+            capture.assert_called_once_with()
 
 
 class TestResolveOutput:
@@ -522,6 +568,7 @@ class TestSystemOutput:
         with (
             patch("prosefmt.providers.get_provider") as mock_gp,
             patch("prosefmt.clipboard.clipboard_read", return_value="original text"),
+            patch("prosefmt.clipboard.capture_selection", return_value="original text"),
             patch("prosefmt.clipboard.clipboard_write"),
             patch("prosefmt.clipboard.paste_to_active_window", return_value=True),
             patch("prosefmt.clipboard.preserve_clipboard") as mock_ctx,
@@ -536,6 +583,7 @@ class TestSystemOutput:
         with (
             patch("prosefmt.providers.get_provider") as mock_gp,
             patch("prosefmt.clipboard.clipboard_read", return_value="original text"),
+            patch("prosefmt.clipboard.capture_selection", return_value="original text"),
             patch("prosefmt.clipboard.clipboard_write"),
             patch("prosefmt.clipboard.paste_to_active_window", return_value=False),
             patch("prosefmt.clipboard.preserve_clipboard") as mock_ctx,

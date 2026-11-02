@@ -15,13 +15,17 @@ from prosefmt.platform import detect as _detect_platform
 def _config_dir() -> Path:
     """Platform-appropriate config directory.
 
-    Linux / macOS: ``$XDG_CONFIG_HOME/prosefmt`` (default ``~/.config/prosefmt``)
-    Windows:       ``%LOCALAPPDATA%\\prosefmt`` (matches the undo-file location)
+    Respects ``XDG_CONFIG_HOME`` on all platforms for testability.
     """
-    if os.name == "nt":
+    xdg_config = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        return Path(xdg_config) / "prosefmt"
+
+    if os.name == "nt":  # Windows
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
         return base / "prosefmt"
-    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "prosefmt"
+    # Linux / macOS
+    return Path.home() / ".config" / "prosefmt"
 
 
 def _config_path() -> Path:
@@ -29,11 +33,17 @@ def _config_path() -> Path:
 
 
 def _default_undo_file() -> str:
-    """Private undo file under XDG_STATE_HOME (not world-readable /tmp)."""
-    if os.name == "nt":
+    """Private undo file under XDG_STATE_HOME (not world-readable /tmp).
+
+    Respects ``XDG_STATE_HOME`` on all platforms for testability.
+    """
+    xdg_state = os.environ.get("XDG_STATE_HOME")
+    if xdg_state:
+        base = Path(xdg_state)
+    elif os.name == "nt":  # Windows
         base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    else:
-        base = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    else:  # Linux / macOS
+        base = Path.home() / ".local" / "state"
     return str(base / "prosefmt" / "undo")
 
 

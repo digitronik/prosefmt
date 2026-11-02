@@ -7,6 +7,7 @@ from unittest.mock import call, patch
 from prosefmt.clipboard import (
     _run_stdin,
     _run_stdout,
+    capture_selection,
     check_clipboard_tools,
     clipboard_read,
     clipboard_write,
@@ -176,9 +177,13 @@ class TestPasteToActiveWindow:
     def test_returns_true_on_windows(self):
         with (
             patch("prosefmt.clipboard.detect_platform", return_value=Platform.WINDOWS),
-            patch("prosefmt.clipboard.subprocess.run"),
+            patch("prosefmt.clipboard._windows_sendinput_ctrl", return_value=False),
+            patch("prosefmt.clipboard.subprocess.run") as run,
         ):
             assert paste_to_active_window() is True
+            cmd = run.call_args.args[0]
+            assert "powershell.exe" in cmd
+            assert "^v" in cmd[-1]
 
     def test_wayland_returns_true_with_wtype(self):
         def _which(c: str) -> str | None:
@@ -212,6 +217,98 @@ class TestPasteToActiveWindow:
     def test_unknown_returns_false(self):
         with patch("prosefmt.clipboard.detect_platform", return_value=Platform.UNKNOWN):
             assert paste_to_active_window() is False
+
+
+class TestCaptureSelection:
+    """macOS / Windows: copy the highlight, then restore the old clipboard."""
+
+    def test_returns_copied_text_and_restores_clipboard(self):
+        state = {"clip": "previous copy"}
+
+        def read(selection: str = "auto") -> str:
+            return state["clip"]
+
+        def write(text: str) -> None:
+            state["clip"] = text
+
+        def send(char: str) -> bool:
+            assert char == "c"
+            state["clip"] = "highlighted words"
+            return True
+
+        with (
+            patch("prosefmt.clipboard.clipboard_read", side_effect=read),
+            patch("prosefmt.clipboard.clipboard_write", side_effect=write),
+            patch("prosefmt.clipboard._send_ctrl_key", side_effect=send),
+            patch("prosefmt.clipboard.time.sleep"),
+        ):
+            assert capture_selection() == "highlighted words"
+
+        assert state["clip"] == "previous copy"
+
+    def test_empty_when_nothing_selected(self):
+        state = {"clip": "previous copy"}
+
+        def read(selection: str = "auto") -> str:
+            return state["clip"]
+
+        def write(text: str) -> None:
+            state["clip"] = text
+
+        clock = {"n": 0}
+
+        def monotonic() -> float:
+            clock["n"] += 1
+            return 0.0 if clock["n"] < 4 else 10.0
+
+        with (
+            patch("prosefmt.clipboard.clipboard_read", side_effect=read),
+            patch("prosefmt.clipboard.clipboard_write", side_effect=write),
+            patch("prosefmt.clipboard._send_ctrl_key", return_value=True),
+            patch("prosefmt.clipboard.time.sleep"),
+            patch("prosefmt.clipboard.time.monotonic", side_effect=monotonic),
+            patch("prosefmt.clipboard.time.monotonic_ns", return_value=1),
+        ):
+            assert capture_selection() == ""
+
+        assert state["clip"] == "previous copy"
+
+    def test_empty_when_copy_shortcut_fails(self):
+        state = {"clip": "previous copy"}
+
+        def write(text: str) -> None:
+            state["clip"] = text
+
+        with (
+            patch("prosefmt.clipboard.clipboard_read", return_value="previous copy"),
+            patch("prosefmt.clipboard.clipboard_write", side_effect=write),
+            patch("prosefmt.clipboard._send_ctrl_key", return_value=False),
+        ):
+            assert capture_selection() == ""
+
+        assert state["clip"] == "previous copy"
+
+    def test_macos_sends_command_c(self):
+        from prosefmt.clipboard import _send_ctrl_key
+
+        with (
+            patch("prosefmt.clipboard.detect_platform", return_value=Platform.MACOS),
+            patch("prosefmt.clipboard.subprocess.run") as run,
+        ):
+            assert _send_ctrl_key("c") is True
+            script = run.call_args.args[0][2]
+            assert 'keystroke "c" using command down' in script
+
+    def test_windows_falls_back_to_sendkeys(self):
+        from prosefmt.clipboard import _send_ctrl_key
+
+        with (
+            patch("prosefmt.clipboard.detect_platform", return_value=Platform.WINDOWS),
+            patch("prosefmt.clipboard._windows_sendinput_ctrl", return_value=False),
+            patch("prosefmt.clipboard.subprocess.run") as run,
+        ):
+            assert _send_ctrl_key("c") is True
+            assert "^c" in run.call_args.args[0][-1]
 
 
 class TestPreserveClipboard:

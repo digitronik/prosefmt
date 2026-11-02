@@ -166,20 +166,22 @@ def _resolve_input(text: str | None, clipboard: bool, system: bool) -> str:
                   and falls back to the clipboard if primary is empty
                   (common on Wayland — Slack, VS Code, Chromium often
                   don't set the primary selection).
-                  On macOS / Windows reads the single system clipboard.
+                  On macOS / Windows there is no primary selection, so
+                  prosefmt sends Cmd+C / Ctrl+C to copy the highlight,
+                  then restores the previous clipboard.
     ``--clipboard`` reads the clipboard selection (Ctrl+C buffer).
     """
     if text:
         return text
 
     if system:
-        from prosefmt.clipboard import clipboard_read
+        from prosefmt.clipboard import capture_selection, clipboard_read
         from prosefmt.platform import Platform, detect_platform
 
         plat = detect_platform()
         if plat in (Platform.LINUX_X11, Platform.LINUX_WAYLAND):
             return clipboard_read(selection="auto")
-        return clipboard_read(selection="clipboard")
+        return capture_selection()
 
     if clipboard:
         from prosefmt.clipboard import clipboard_read

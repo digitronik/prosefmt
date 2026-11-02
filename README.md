@@ -15,8 +15,8 @@
 
 Highlight text in **any application** — browser, email, Slack, VS Code, terminal — press your
 hotkey, and prosefmt rewrites it in place. Grammar fixed, tone shifted, translated, summarized —
-all without leaving the app you're in. (On Linux with X11/Wayland; on macOS/Windows use
-Ctrl+C first — the text is read from the clipboard.)
+all without leaving the app you're in. Linux reads the highlighted selection directly; macOS and
+Windows copy the highlight with Cmd+C / Ctrl+C, then paste the rewrite back.
 
 ```
 $ prosefmt "i can haz good grammer?"
@@ -409,10 +409,10 @@ prosefmt -p openai --model gpt-4o "some text here"
 
 ### System-wide rewriting
 
-The killer feature on Linux: highlight text, press your hotkey, and the rewritten
-text replaces the original — without switching windows or touching the mouse.
-On macOS/Windows, copy the text first (Ctrl+C / Cmd+C); prosefmt reads from
-the clipboard.
+Highlight text, press your hotkey, and the rewritten text replaces the original —
+without switching windows or touching the mouse. On Linux this reads the primary
+selection. On macOS and Windows, prosefmt sends Cmd+C / Ctrl+C itself (there is
+no primary selection), rewrites that text, then pastes it back over the highlight.
 
 ```bash
 # Read highlighted text → rewrite → paste back in-place
@@ -427,7 +427,7 @@ prosefmt -s -n
 
 How `--system` works:
 
-1. Reads the highlighted text (primary selection on Linux, clipboard on macOS/Windows)
+1. Reads the highlighted text (primary selection on Linux; Cmd+C / Ctrl+C on macOS and Windows)
 2. Sends it to the AI with the selected mode's prompt
 3. Saves the original for undo
 4. Writes the result to clipboard
